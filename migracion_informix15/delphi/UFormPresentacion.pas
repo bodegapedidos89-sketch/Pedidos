@@ -112,8 +112,9 @@ begin
       end;
       Qry.Close;
 
-      Frm.btnCancelar.Top := Y + 8;
-      Frm.ClientHeight := Y + 56;
+      Frm.pnlBotones.Height := Y + 8;
+      Frm.btnCancelar.Top := Frm.pnlBotones.Top + Y + 8;
+      Frm.ClientHeight := Frm.btnCancelar.Top + Frm.btnCancelar.Height + 16;
       Frm.Position := poScreenCenter;
 
       Result := Frm.ShowModal = mrOk;
