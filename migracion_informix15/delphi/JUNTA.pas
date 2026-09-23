@@ -2635,9 +2635,13 @@ begin
        cantidad := StrToFloat(caj_pro.text);
 
        if FEsVariableSel then
+         // peso variable: 'cantidad' ya es el peso bruto leido en bascula,
+         // se resta la tara una sola vez (la del envase que se peso)
          kilos := cantidad - FTaraSel
        else
-         kilos := cantidad * FFactorPresentacion;
+         // cantidad contada (no se pesa): se resta la tara de CADA unidad
+         // ej. 10 cajas x 20kg brutos - 10 cajas x 0.5kg tara = 195kg netos
+         kilos := (cantidad * FFactorPresentacion) - (cantidad * FTaraSel);
 
        canemp := BuscaCanEmp(FCodArtResuelto);
        if canemp > 0 then
