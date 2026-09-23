@@ -1922,6 +1922,7 @@ type
   FPrecioDerivadoSel: Boolean;
   FTaraSel: Double;
   FEsVariableSel: Boolean;
+  FCajasCalc: Double;
   function PrecioPresentacion(const PrecioTexto: string): string;
   function BuscaCanEmp(const CodArt: string): Double;
   end;
@@ -2631,9 +2632,6 @@ begin
      // === NUEVO: CAJ_PRO ahora es "cantidad"; se calcula kilos/cajas segun presentacion ===
      if FIdPresentacionSel > 0 then
      begin
-       caj_pro.text := floattostrf(strtofloat(caj_pro.text), ffnumber,10,2);
-       caj_pro.text := stripped(',', caj_pro.text);
-
        cantidad := StrToFloat(caj_pro.text);
 
        if FEsVariableSel then
@@ -2647,7 +2645,10 @@ begin
        else
          cajas := cantidad;
 
-       caj_pro.Text := FloatToStrF(cajas, ffFixed, 10, 4);
+       // OJO: "Cantidad" (caj_pro) NO se toca -- se queda mostrando
+       // exactamente lo que tecleo el cajero. "cajas" se guarda aparte
+       // (FCajasCalc) para usarse solo al grabar en ventas.
+       FCajasCalc := cajas;
        kil_pro.Text := FloatToStrF(kilos, ffFixed, 10, 4);
 
        qcotiza.Close;
@@ -3736,7 +3737,10 @@ begin
                       inserta_ventas.params[0].AsString:= foliotmp;
                       inserta_ventas.params[1].AsString:= descripart.text;
                       inserta_ventas.params[2].AsString:= codigoART.text;
-                      inserta_ventas.params[3].AsString:= caj_pro.text;
+                      if FIdPresentacionSel > 0 then
+                        inserta_ventas.params[3].AsString:= FloatToStr(FCajasCalc)
+                      else
+                        inserta_ventas.params[3].AsString:= caj_pro.text;
                       inserta_ventas.params[4].AsString:= kil_pro.Text;
                       inserta_ventas.params[5].AsSTRING:= PRESINTO;
                       inserta_ventas.params[6].AsSTRING:= CAMBIO_total;
