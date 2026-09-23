@@ -3070,6 +3070,17 @@ begin
                     MULTI := CAJ_PRO.TEXT;
                 END;
 
+                // === NUEVO: si el articulo esta migrado a presentaciones, el precio
+                // siempre es "por unidad de la presentacion elegida" -- se ignora todo
+                // el branching de tip_art de arriba y se usa cantidad*precio directo ===
+                IF FIdPresentacionSel > 0 THEN
+                BEGIN
+                    TOTAL:= floattostrf((STRTOFLOAT(caj_PRO.TEXT) * STRTOFLOAT(PRE_PRO.TEXT)),ffnumber,10,2);
+                    total := stripped(',',total);
+                    MULTI := CAJ_PRO.TEXT;
+                END;
+                // ===========================================================
+
 
 
 
