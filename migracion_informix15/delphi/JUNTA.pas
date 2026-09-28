@@ -4433,7 +4433,7 @@ begin
     reng := reng + 1;
     NUM_ARTICULOS := NUM_ARTICULOS + 1;
 
-    inserta_ventas.params[0].AsString  := foliotmp;
+    inserta_ventas.params[0].AsString  := tfolio.Text;
     inserta_ventas.params[1].AsString  := descComp;
     inserta_ventas.params[2].AsString  := codLegacyComp;
     inserta_ventas.params[3].AsString  := FloatToStr(cajasComp);
@@ -4458,7 +4458,7 @@ begin
 
     qmarcapresentacion.Close;
     qmarcapresentacion.ParamByName('emp').AsString    := NUM_EMPRESA.Text;
-    qmarcapresentacion.ParamByName('folio').AsString  := foliotmp;
+    qmarcapresentacion.ParamByName('folio').AsString  := tfolio.Text;
     qmarcapresentacion.ParamByName('reng').AsInteger  := reng;
     qmarcapresentacion.ParamByName('idpres').AsInteger:= qBundleDetalle.FieldByName('id_presentacion').AsInteger;
     qmarcapresentacion.ExecSQL;
