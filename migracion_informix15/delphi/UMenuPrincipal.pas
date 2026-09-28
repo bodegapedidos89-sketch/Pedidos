@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls,
-  UMantArticulos, UMantBundles;
+  UMantArticulos, UMantBundles, formato, UOCRecepcion;
 
 type
   TFormMenuPrincipal = class(TForm)
@@ -13,9 +13,13 @@ type
     lblTitulo: TLabel;
     btnArticulos: TButton;
     btnBundles: TButton;
+    btnCompras: TButton;
+    btnRecepcion: TButton;
     btnSalir: TButton;
     procedure btnArticulosClick(Sender: TObject);
     procedure btnBundlesClick(Sender: TObject);
+    procedure btnComprasClick(Sender: TObject);
+    procedure btnRecepcionClick(Sender: TObject);
     procedure btnSalirClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
   end;
@@ -49,6 +53,26 @@ begin
     FormMantBundles.ShowModal;
   finally
     FormMantBundles.Free;
+  end;
+end;
+
+procedure TFormMenuPrincipal.btnComprasClick(Sender: TObject);
+begin
+  Form1 := TForm1.Create(Application);
+  try
+    Form1.ShowModal;
+  finally
+    Form1.Free;
+  end;
+end;
+
+procedure TFormMenuPrincipal.btnRecepcionClick(Sender: TObject);
+begin
+  FormOCRecepcion := TFormOCRecepcion.Create(Application);
+  try
+    FormOCRecepcion.ShowModal;
+  finally
+    FormOCRecepcion.Free;
   end;
 end;
 

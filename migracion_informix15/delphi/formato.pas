@@ -602,6 +602,7 @@ type
     qinvenobserva: TStringField;
     opcion: TRadioGroup;
     qBuscaCanEmp: TQuery;
+    qInsOCDetalle: TQuery;
     procedure FormCreate(Sender: TObject);
     procedure nom_proClick(Sender: TObject);
     procedure cod_ArtClick(Sender: TObject);
@@ -1379,22 +1380,25 @@ begin
                     tot_exe:= tot_exe +  strtofloat(qsaca.fieldbyname('total').AsString);    }
 
 
-                  tr_pedido.params[0].AsString:= numempresa.text;        //num empresa
-                  tr_pedido.params[1].asstring:= numempresa.text;    //num_sucursal
-                  tr_pedido.params[2].AsString:= qsaca.fieldbyname('cod_art').AsString;   //codigo articulo
-                  tr_pedido.params[3].AsString:= edit1.text;  //pedido.
-                  tr_pedido.params[4].asstring:= fechaac;    //fecha
-                  tr_pedido.params[5].asfloat:= strtofloat(qsaca.fieldbyname('kilos').AsString);
-                  tr_pedido.params[6].Asfloat:= strtofloat(qsaca.fieldbyname('cajas').AsString);
-                  tr_pedido.params[7].AsString:=  '0';                         // FLETE
-                  tr_pedido.params[8].Asfloat:= strtofloat(qsaca.fieldbyname('precio').AsString);  //COS UNI sisevuelve a activar esta empresa poner la linea de abajo
-                 // qsaca.fieldbyname('precio').Asfloat + (qsaca.fieldbyname('precio').Asfloat *  (qBUSARTI.fieldbyname('PRECIO_4').Asfloat/100));  //COS UNI
-                  tr_pedido.params[9].AsString:= CODIGOBIEN; // CODIGO PROVEEDOR
-                  tr_pedido.params[10].Asfloat:= qsaca.fieldbyname('iva').Asfloat;
-                 // (qsaca.fieldbyname('iva').Asfloat +(qsaca.fieldbyname('iva').Asfloat *  (qBUSARTI.fieldbyname('PRECIO_4').Asfloat/100)));
-                  tr_pedido.params[11].AsString:=  '0';                         // descuento
-                  tr_pedido.params[12].Asfloat:= strtofloat(qsaca.FieldByName('renglon').AsString);
-                  tr_pedido.execproc;
+                  // ya NO se llama tr_pedido (inserta_tr_ped): eso subia
+                  // el Kardex (inartrinv/inarinv) en el momento de
+                  // Guardar. Ahora solo se dejan los renglones como
+                  // "pedidos" (oc_pedido_detalle, estado='P'); el Kardex
+                  // se afecta hasta que almacen confirma la recepcion
+                  // (ver UOCRecepcion.pas / sp_recibe_renglon_oc).
+                  qInsOCDetalle.Close;
+                  qInsOCDetalle.ParamByName('num_emp').AsString := numempresa.text;
+                  qInsOCDetalle.ParamByName('num_suc').AsString := numempresa.text;
+                  qInsOCDetalle.ParamByName('num_ped').AsInteger := strtoint(edit1.text);
+                  qInsOCDetalle.ParamByName('renglon').AsInteger := qsaca.FieldByName('renglon').AsInteger;
+                  qInsOCDetalle.ParamByName('cod_art').AsString := qsaca.fieldbyname('cod_art').AsString;
+                  qInsOCDetalle.ParamByName('cod_pro').AsString := CODIGOBIEN;
+                  qInsOCDetalle.ParamByName('cant_caj').AsFloat := strtofloat(qsaca.fieldbyname('cajas').AsString);
+                  qInsOCDetalle.ParamByName('cant_kil').AsFloat := strtofloat(qsaca.fieldbyname('kilos').AsString);
+                  qInsOCDetalle.ParamByName('cos_uni').AsFloat := strtofloat(qsaca.fieldbyname('precio').AsString);
+                  qInsOCDetalle.ParamByName('iva').AsFloat := qsaca.fieldbyname('iva').Asfloat;
+                  qInsOCDetalle.ParamByName('fech_ped').AsDate := fechauno.Date;
+                  qInsOCDetalle.ExecSQL;
 
 
             {       if codigobien <> 'C62T' then

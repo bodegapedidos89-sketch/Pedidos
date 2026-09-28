@@ -4146,4 +4146,72 @@ object Form1: TForm1
         ParamType = ptInput
       end>
   end
+  object qInsOCDetalle: TQuery
+    DatabaseName = 'comyleg'
+    SQL.Strings = (
+      'INSERT INTO oc_pedido_detalle'
+      '(num_emp, num_suc, num_ped, renglon, cod_art, cod_pro,'
+      ' cantidad_ped_cajas, cantidad_ped_kilos, cos_uni, iva, fech_ped, estado)'
+      'VALUES'
+      '(:num_emp, :num_suc, :num_ped, :renglon, :cod_art, :cod_pro,'
+      ' :cant_caj, :cant_kil, :cos_uni, :iva, :fech_ped, '#39'P'#39')')
+    Left = 872
+    Top = 336
+    ParamData = <
+      item
+        DataType = ftString
+        Name = 'num_emp'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'num_suc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftInteger
+        Name = 'num_ped'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftSmallint
+        Name = 'renglon'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'cod_art'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'cod_pro'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'cant_caj'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'cant_kil'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'cos_uni'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'iva'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftDate
+        Name = 'fech_ped'
+        ParamType = ptInput
+      end>
+  end
 end
