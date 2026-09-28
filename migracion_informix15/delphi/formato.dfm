@@ -622,6 +622,15 @@ object Form1: TForm1
         3BB33773333773333773B333333B3333333B7333333733333337}
       NumGlyphs = 2
     end
+    object btImprimir: TBitBtn
+      Left = 520
+      Top = 452
+      Width = 137
+      Height = 33
+      Caption = 'Imprimir Orden'
+      TabOrder = 12
+      OnClick = btImprimirClick
+    end
     object BitBtn2: TBitBtn
       Left = 520
       Top = 496
@@ -1828,6 +1837,7 @@ object Form1: TForm1
       end>
   end
   object RvProject1: TRvProject
+    Engine = RvSystem1
     ProjectFile = 'C:\delphi\reportes\pruebas\reporte oc.rav'
     Left = 352
     Top = 489
@@ -1837,6 +1847,21 @@ object Form1: TForm1
     DataSet = qsaca
     Left = 352
     Top = 521
+  end
+  object RvSystem1: TRvSystem
+    TitleSetup = 'Output Options'
+    TitleStatus = 'Report Status'
+    TitlePreview = 'Report Preview'
+    DefaultDest = rdPreview
+    SystemFiler.StatusFormat = 'Generating page %p'
+    SystemPreview.ZoomFactor = 100.000000000000000000
+    SystemPrinter.ScaleX = 100.000000000000000000
+    SystemPrinter.ScaleY = 100.000000000000000000
+    SystemPrinter.StatusFormat = 'Printing page %p'
+    SystemPrinter.Title = 'ReportPrinter Report'
+    SystemPrinter.UnitsFactor = 1.000000000000000000
+    Left = 384
+    Top = 489
   end
   object qcodpro: TQuery
     DatabaseName = 'comyleg'

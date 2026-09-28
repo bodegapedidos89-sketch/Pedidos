@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, ExtCtrls, DBTables, DB, Grids, DBGrids, DBCtrls, StdCtrls, jpeg,
-  Buttons, RpCon, RpConDS, RpDefine, RpRave, personal, Menus, Mask,
+  Buttons, RpCon, RpConDS, RpDefine, RpRave, RpSystem, personal, Menus, Mask,
   ComCtrls;
 
 type
@@ -125,6 +125,9 @@ type
     tr_pedido: TStoredProc;
     RvProject1: TRvProject;
     Orden: TRvDataSetConnection;
+    RvSystem1: TRvSystem;
+    btImprimir: TBitBtn;
+    procedure btImprimirClick(Sender: TObject);
     mx: TPanel;
     Label2: TLabel;
     Label3: TLabel;
@@ -1874,7 +1877,7 @@ begin
     pre_pro.text:= '0';
     tot_pro.text:= '0';
 
- //  cod_Art22.text:= qart.fieldbyname('cod_Art').AsString;
+    cod_Art22.text:= qart.fieldbyname('cod_Art').AsString;
 
 end;
 
@@ -2358,6 +2361,44 @@ begin
   //   EXIT;
 end;
 
+procedure TForm1.btImprimirClick(Sender: TObject);
+begin
+  if Trim(edit1.text) = '' then
+  begin
+    showmessage('Primero captura o selecciona el numero de pedido');
+    edit1.SetFocus;
+    exit;
+  end;
+
+  qsaca.Close;
+  qsaca.ParamByName('no_pedido').AsInteger := strtoint(edit1.text);
+  qsaca.Open;
+
+  if qsaca.Eof then
+  begin
+    showmessage('Este pedido no tiene productos capturados');
+    exit;
+  end;
+
+  // datos generales de la orden; el .rav debe traer un objeto de texto
+  // ligado a la variable global CODBARRAS con una fuente de codigo de
+  // barras (Code 39) instalada -- el * al inicio/fin lo exige ese
+  // formato de barra. El detalle (cod_art, cantidades, precio) ya
+  // viaja por el dataset qsaca via el componente Orden (TRvDataSetConnection).
+  RvProject1.SetParam('NUM_PEDIDO', edit1.text);
+  RvProject1.SetParam('CODBARRAS', '*' + Trim(edit1.text) + '*');
+  RvProject1.SetParam('PROVEEDOR', name_pro.Text);
+  RvProject1.SetParam('FECHA', datetostr(fechauno.Date));
+  RvProject1.SetParam('TOTAL', edtotal.Text);
+
+  RvSystem1.DefaultDest := rdPreview;
+  RvSystem1.SystemSetups := RvSystem1.SystemSetups - [ssAllowSetup];
+
+  RvProject1.Open;
+  RvProject1.Execute;
+  RvProject1.Close;
+end;
+
 procedure TForm1.Button1Click(Sender: TObject);
 begin
      form3.show;
@@ -2384,9 +2425,9 @@ begin
 
       if opcion2.itemindex = 1 then
           begin
-           { qart.Close;
+            qart.Close;
             qart.parambyname('num_emp').AsString:= numempresa.text;
-            qart.open; }
+            qart.open;
 
             qcodi.close;
             des_pro22.Visible:= true;
