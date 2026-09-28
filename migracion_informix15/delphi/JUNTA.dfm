@@ -12426,6 +12426,54 @@ object Form9: TForm9
     Left = 776
     Top = 224
   end
+  object qBuscaBundle: TQuery
+    DatabaseName = 'comyleg'
+    SQL.Strings = (
+      'SELECT id_bundle FROM bundle_producto '
+      'WHERE num_emp = :emp AND cod_bundle = :cod AND activo = ''S'''
+      ''
+      '')
+    Left = 744
+    Top = 304
+    ParamData = <
+      item
+        DataType = ftString
+        Name = 'emp'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'cod'
+        ParamType = ptInput
+      end>
+  end
+  object qBundleDetalle: TQuery
+    DatabaseName = 'comyleg'
+    SQL.Strings = (
+      'SELECT bd.id_presentacion, bd.cantidad_x_bundle, '
+      'ap.cod_art_legacy, ap.factor_a_base, ap.tara_kg, ap.es_variable, '
+      'inarinv.des_art'
+      'FROM bundle_detalle bd, art_presentacion ap, inarinv'
+      'WHERE bd.id_bundle = :idbundle'
+      '  AND bd.id_presentacion = ap.id_presentacion'
+      '  AND inarinv.num_emp = :emp'
+      '  AND inarinv.cod_art = ap.cod_art_legacy'
+      'ORDER BY bd.orden'
+      '')
+    Left = 744
+    Top = 344
+    ParamData = <
+      item
+        DataType = ftInteger
+        Name = 'idbundle'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'emp'
+        ParamType = ptInput
+      end>
+  end
   object qBuscaCanEmp: TQuery
     DatabaseName = 'comyleg'
     SQL.Strings = (

@@ -1826,6 +1826,8 @@ type
     DataSource172: TDataSource;
     qmarcapresentacion: TQuery;
     qBuscaCanEmp: TQuery;
+    qBuscaBundle: TQuery;
+    qBundleDetalle: TQuery;
     procedure FormShow(Sender: TObject);
     procedure inicializa;
     procedure factuExit(Sender: TObject);
@@ -1923,8 +1925,12 @@ type
   FTaraSel: Double;
   FEsVariableSel: Boolean;
   FCajasCalc: Double;
+  FEsBundle: Boolean;
+  FIdBundleSel: Integer;
   function PrecioPresentacion(const PrecioTexto: string): string;
   function BuscaCanEmp(const CodArt: string): Double;
+  function ConvierteCantidad(Cantidad, Factor, Tara: Double; EsVariable: Boolean): Double;
+  procedure ProcesaBundle(IdBundle: Integer; CantidadBundles: Double);
   end;
 
 var
@@ -2629,19 +2635,26 @@ begin
      if caj_pro.Text = '' then
           caj_pro.text:= '0';
 
+     // === NUEVO: BUNDLE -- CAJ_PRO aqui es "cantidad de bundles" ===
+     if FEsBundle then
+     begin
+       ProcesaBundle(FIdBundleSel, StrToFloat(caj_pro.text));
+       FEsBundle := False;
+       FIdBundleSel := 0;
+       CAJ_PRO.Text := '';
+       KIL_PRO.Text := '';
+       PRE_PRO.Text := '';
+       CODIGOART.SetFocus;
+       Exit;
+     end;
+     // ================================================================
+
      // === NUEVO: CAJ_PRO ahora es "cantidad"; se calcula kilos/cajas segun presentacion ===
      if FIdPresentacionSel > 0 then
      begin
        cantidad := StrToFloat(caj_pro.text);
 
-       if FEsVariableSel then
-         // peso variable: 'cantidad' ya es el peso bruto leido en bascula,
-         // se resta la tara una sola vez (la del envase que se peso)
-         kilos := cantidad - FTaraSel
-       else
-         // cantidad contada (no se pesa): se resta la tara de CADA unidad
-         // ej. 10 cajas x 20kg brutos - 10 cajas x 0.5kg tara = 195kg netos
-         kilos := (cantidad * FFactorPresentacion) - (cantidad * FTaraSel);
+       kilos := ConvierteCantidad(cantidad, FFactorPresentacion, FTaraSel, FEsVariableSel);
 
        canemp := BuscaCanEmp(FCodArtResuelto);
        if canemp > 0 then
@@ -4299,6 +4312,164 @@ begin
     Result := qBuscaCanEmp.FieldByName('can_emp').AsFloat;
   qBuscaCanEmp.Close;
 end;
+
+function TForm9.ConvierteCantidad(Cantidad, Factor, Tara: Double;
+  EsVariable: Boolean): Double;
+begin
+  if EsVariable then
+    // peso variable: 'Cantidad' ya es el peso bruto leido en bascula,
+    // se resta la tara una sola vez (la del envase que se peso)
+    Result := Cantidad - Tara
+  else
+    // cantidad contada (no se pesa): se resta la tara de CADA unidad
+    Result := (Cantidad * Factor) - (Cantidad * Tara);
+end;
+
+procedure TForm9.ProcesaBundle(IdBundle: Integer; CantidadBundles: Double);
+var
+  precioBundleUnit, importeBundle, valorListaTotal: Double;
+  cantComp, factorComp, taraComp, canempComp, kilosComp, cajasComp: Double;
+  esVarComp: Boolean;
+  codLegacyComp, descComp: string;
+  precioIndivComp, valorListaComp, precioAsignado, importeComp: Double;
+  numComponentes: Integer;
+begin
+  // 1. precio del bundle: se busca en cotiza igual que cualquier articulo,
+  // usando el codigo del bundle tal cual se tecleo
+  qcotiza.Close;
+  qcotiza.ParamByName('cod_cli').AsString := cod_CLI;
+  qcotiza.ParamByName('cod_art').AsString := CODIGOART.Text;
+  qcotiza.ParamByName('fecha').AsDate := fechavientos.Date;
+  qcotiza.Open;
+  if qcotiza.FieldByName('Precio').AsString = '' then
+  begin
+    qcotiza.Close;
+    ShowMessage('Este bundle no tiene precio configurado en la lista de precios (cotiza)');
+    Exit;
+  end;
+  precioBundleUnit := qcotiza.FieldByName('precio').AsFloat;
+  qcotiza.Close;
+  importeBundle := precioBundleUnit * CantidadBundles;
+
+  // 2. primera pasada: valor de lista total de los componentes (para la proporcion)
+  valorListaTotal := 0;
+  numComponentes := 0;
+  qBundleDetalle.Close;
+  qBundleDetalle.ParamByName('idbundle').AsInteger := IdBundle;
+  qBundleDetalle.ParamByName('emp').AsString := NUM_EMPRESA.Text;
+  qBundleDetalle.Open;
+  while not qBundleDetalle.Eof do
+  begin
+    cantComp := qBundleDetalle.FieldByName('cantidad_x_bundle').AsFloat * CantidadBundles;
+    codLegacyComp := Trim(qBundleDetalle.FieldByName('cod_art_legacy').AsString);
+
+    qcotiza.Close;
+    qcotiza.ParamByName('cod_cli').AsString := cod_CLI;
+    qcotiza.ParamByName('cod_art').AsString := codLegacyComp;
+    qcotiza.ParamByName('fecha').AsDate := fechavientos.Date;
+    qcotiza.Open;
+    if qcotiza.FieldByName('precio').AsString <> '' then
+      precioIndivComp := qcotiza.FieldByName('precio').AsFloat
+    else
+      precioIndivComp := 0;
+    qcotiza.Close;
+
+    valorListaTotal := valorListaTotal + (cantComp * precioIndivComp);
+    Inc(numComponentes);
+    qBundleDetalle.Next;
+  end;
+  qBundleDetalle.Close;
+
+  if numComponentes = 0 then
+  begin
+    ShowMessage('Este bundle no tiene componentes configurados (bundle_detalle vacio)');
+    Exit;
+  end;
+
+  // 3. segunda pasada: calcular y grabar cada componente como un renglon normal
+  qBundleDetalle.Open;
+  while not qBundleDetalle.Eof do
+  begin
+    cantComp      := qBundleDetalle.FieldByName('cantidad_x_bundle').AsFloat * CantidadBundles;
+    codLegacyComp := Trim(qBundleDetalle.FieldByName('cod_art_legacy').AsString);
+    factorComp    := qBundleDetalle.FieldByName('factor_a_base').AsFloat;
+    taraComp      := qBundleDetalle.FieldByName('tara_kg').AsFloat;
+    esVarComp     := Trim(qBundleDetalle.FieldByName('es_variable').AsString) = 'S';
+    descComp      := Trim(qBundleDetalle.FieldByName('des_art').AsString);
+
+    kilosComp := ConvierteCantidad(cantComp, factorComp, taraComp, esVarComp);
+
+    canempComp := BuscaCanEmp(codLegacyComp);
+    if canempComp > 0 then
+      cajasComp := kilosComp / canempComp
+    else
+      cajasComp := cantComp;
+
+    qcotiza.Close;
+    qcotiza.ParamByName('cod_cli').AsString := cod_CLI;
+    qcotiza.ParamByName('cod_art').AsString := codLegacyComp;
+    qcotiza.ParamByName('fecha').AsDate := fechavientos.Date;
+    qcotiza.Open;
+    if qcotiza.FieldByName('precio').AsString <> '' then
+      precioIndivComp := qcotiza.FieldByName('precio').AsFloat
+    else
+      precioIndivComp := 0;
+    qcotiza.Close;
+
+    if valorListaTotal > 0 then
+    begin
+      valorListaComp := cantComp * precioIndivComp;
+      importeComp := importeBundle * valorListaComp / valorListaTotal;
+    end
+    else
+      // ningun componente tiene precio de referencia: se reparte en partes iguales
+      importeComp := importeBundle / numComponentes;
+
+    if cantComp > 0 then
+      precioAsignado := importeComp / cantComp
+    else
+      precioAsignado := 0;
+
+    reng := reng + 1;
+    NUM_ARTICULOS := NUM_ARTICULOS + 1;
+
+    inserta_ventas.params[0].AsString  := foliotmp;
+    inserta_ventas.params[1].AsString  := descComp;
+    inserta_ventas.params[2].AsString  := codLegacyComp;
+    inserta_ventas.params[3].AsString  := FloatToStr(cajasComp);
+    inserta_ventas.params[4].AsString  := FloatToStr(kilosComp);
+    inserta_ventas.params[5].AsString  := FloatToStr(precioAsignado);
+    inserta_ventas.params[6].AsString  := FloatToStr(importeComp);
+    inserta_ventas.params[7].AsString  := form4.agente1;
+    inserta_ventas.params[8].AsString  := INTTOSTR(IVA);
+    inserta_ventas.params[9].AsString  := '0';
+    inserta_ventas.params[10].AsString := '0';
+    inserta_ventas.params[11].AsInteger:= reng;
+    inserta_ventas.params[12].AsInteger:= 1;
+    inserta_ventas.params[13].AsString := Trfc.Text;
+    inserta_ventas.params[14].AsString := tip_aRT;
+    inserta_ventas.params[15].AsString := lin_ven;
+    inserta_ventas.params[16].AsString := '0';
+    inserta_ventas.params[17].AsString := edit2.Text;
+    inserta_ventas.params[18].AsString := 'BUNDLE';
+    inserta_ventas.params[19].AsString := CSUCURSAL.Text;
+    inserta_ventas.params[20].AsString := NUM_EMPRESA.Text;
+    inserta_ventas.ExecProc;
+
+    qmarcapresentacion.Close;
+    qmarcapresentacion.ParamByName('emp').AsString    := NUM_EMPRESA.Text;
+    qmarcapresentacion.ParamByName('folio').AsString  := foliotmp;
+    qmarcapresentacion.ParamByName('reng').AsInteger  := reng;
+    qmarcapresentacion.ParamByName('idpres').AsInteger:= qBundleDetalle.FieldByName('id_presentacion').AsInteger;
+    qmarcapresentacion.ExecSQL;
+
+    TOTAL := FloatToStrF(importeComp, ffNumber, 10, 2);
+    sacatotal;
+
+    qBundleDetalle.Next;
+  end;
+  qBundleDetalle.Close;
+end;
 //===========================
 
 procedure TForm9.CODIGOARTKeyPress(Sender: TObject; var Key: Char);
@@ -4312,6 +4483,31 @@ begin
       sirestau:= 0;
       SITIENECOTI := 0;
       PRE1F:= 0;
+
+      // === NUEVO: detectar si el codigo tecleado es un BUNDLE ===
+      qBuscaBundle.Close;
+      qBuscaBundle.SQL.Text :=
+        'SELECT id_bundle FROM bundle_producto ' +
+        'WHERE num_emp = :emp AND cod_bundle = :cod AND activo = ''S''';
+      qBuscaBundle.ParamByName('emp').AsString := NUM_EMPRESA.Text;
+      qBuscaBundle.ParamByName('cod').AsString := Trim(CODIGOART.Text);
+      qBuscaBundle.Open;
+      FEsBundle := not qBuscaBundle.Eof;
+      if FEsBundle then
+        FIdBundleSel := qBuscaBundle.FieldByName('id_bundle').AsInteger;
+      qBuscaBundle.Close;
+
+      if FEsBundle then
+      begin
+        // no se resuelve presentacion individual ni se buscan cotizaciones
+        // aqui -- se pide directo la cantidad de bundles en CAJ_PRO
+        FIdPresentacionSel := 0;
+        Key := #0;
+        CAJ_PRO.Text := '';
+        CAJ_PRO.SetFocus;
+        Exit;
+      end;
+      // ============================================================
 
       // === NUEVO: resolver presentacion ANTES de cualquier busqueda de precio ===
       if not TFormPresentacion.Seleccionar(Database1, CODIGOART.Text, 'V',
