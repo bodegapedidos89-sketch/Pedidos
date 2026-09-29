@@ -3,7 +3,7 @@ object FormMenuPrincipal: TFormMenuPrincipal
   Top = 200
   BorderStyle = bsDialog
   Caption = 'Menu de mantenimiento'
-  ClientHeight = 300
+  ClientHeight = 400
   ClientWidth = 300
   Position = poScreenCenter
   OnCreate = FormCreate
@@ -26,7 +26,7 @@ object FormMenuPrincipal: TFormMenuPrincipal
     Left = 16
     Top = 44
     Width = 268
-    Height = 240
+    Height = 340
     BevelOuter = bvNone
     object btnArticulos: TButton
       Left = 0
@@ -64,13 +64,31 @@ object FormMenuPrincipal: TFormMenuPrincipal
       TabOrder = 3
       OnClick = btnRecepcionClick
     end
-    object btnSalir: TButton
+    object btnCierre: TButton
       Left = 0
       Top = 200
       Width = 268
+      Height = 40
+      Caption = 'Cierre Diario'
+      TabOrder = 4
+      OnClick = btnCierreClick
+    end
+    object btnTendencias: TButton
+      Left = 0
+      Top = 250
+      Width = 268
+      Height = 40
+      Caption = 'Tendencias de Existencia Negativa'
+      TabOrder = 5
+      OnClick = btnTendenciasClick
+    end
+    object btnSalir: TButton
+      Left = 0
+      Top = 300
+      Width = 268
       Height = 30
       Caption = 'Salir'
-      TabOrder = 4
+      TabOrder = 6
       OnClick = btnSalirClick
     end
   end

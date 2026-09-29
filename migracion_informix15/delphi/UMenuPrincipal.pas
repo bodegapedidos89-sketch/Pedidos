@@ -5,7 +5,8 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls,
-  UMantArticulos, UMantBundles, formato, UOCRecepcion;
+  UMantArticulos, UMantBundles, formato, UOCRecepcion, UCierreDiario,
+  UReporteNegativos;
 
 type
   TFormMenuPrincipal = class(TForm)
@@ -15,11 +16,15 @@ type
     btnBundles: TButton;
     btnCompras: TButton;
     btnRecepcion: TButton;
+    btnCierre: TButton;
+    btnTendencias: TButton;
     btnSalir: TButton;
     procedure btnArticulosClick(Sender: TObject);
     procedure btnBundlesClick(Sender: TObject);
     procedure btnComprasClick(Sender: TObject);
     procedure btnRecepcionClick(Sender: TObject);
+    procedure btnCierreClick(Sender: TObject);
+    procedure btnTendenciasClick(Sender: TObject);
     procedure btnSalirClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
   end;
@@ -73,6 +78,26 @@ begin
     FormOCRecepcion.ShowModal;
   finally
     FormOCRecepcion.Free;
+  end;
+end;
+
+procedure TFormMenuPrincipal.btnCierreClick(Sender: TObject);
+begin
+  FormCierreDiario := TFormCierreDiario.Create(Application);
+  try
+    FormCierreDiario.ShowModal;
+  finally
+    FormCierreDiario.Free;
+  end;
+end;
+
+procedure TFormMenuPrincipal.btnTendenciasClick(Sender: TObject);
+begin
+  FormReporteNegativos := TFormReporteNegativos.Create(Application);
+  try
+    FormReporteNegativos.ShowModal;
+  finally
+    FormReporteNegativos.Free;
   end;
 end;
 
