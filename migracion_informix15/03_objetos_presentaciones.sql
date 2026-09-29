@@ -9,6 +9,32 @@
 --
 -- Version final acordada (ya sin mov_captura / sp_aplica_mov_captura /
 -- tr_mov_captura_kardex, que fueron el primer diseno y se descartaron).
+--
+-- ACTUALIZADO para que quede igual a lo que de verdad esta corriendo en
+-- produccion (el archivo se habia quedado desactualizado; lo corregido
+-- se aplico en su momento directo en el servidor via DROP/CREATE, pero
+-- nunca se reflejo aqui). Dos correcciones sobre la version original de
+-- este archivo:
+--
+--   1. sp_aplica_presentacion_venta tenia sus parametros con el MISMO
+--      nombre que las columnas de ventas (emp/folio/renglon...), lo que
+--      en Informix hace que "WHERE folio = folio AND renglon = renglon"
+--      se resuelva como una comparacion de la columna consigo misma
+--      (tautologia, siempre verdadera) en vez de comparar contra el
+--      parametro -- el SELECT INTO agarraba una fila cualquiera de esa
+--      empresa en vez del renglon correcto. Se corrigio prefijando
+--      todos los parametros con "p_".
+--
+--   2. El calculo de kilos/cajas/costo YA lo hace Delphi antes de
+--      insertar (ver JUNTA.pas, CAJ_PROExit/ProcesaBundle) y el
+--      id_presentacion se marca con un UPDATE SEPARADO despues del
+--      INSERT (qmarcapresentacion.ExecSQL) -- un trigger de INSERT
+--      nunca vuelve a dispararse con ese UPDATE, asi que siempre veia
+--      id_presentacion en NULL. Se simplifico el procedimiento (ya no
+--      recalcula nada, solo deja la auditoria en inartrinv_peso con
+--      los valores que ya vienen en la fila) y se agrego un SEGUNDO
+--      trigger sobre "UPDATE OF id_presentacion" para que si dispare
+--      en el momento correcto.
 --------------------------------------------------------------------------
 
 DATABASE <NOMBREBASE>;
@@ -73,68 +99,55 @@ CREATE TABLE "informix".inartrinv_peso
 REVOKE ALL ON "informix".inartrinv_peso FROM "public";
 
 --------------------------------------------------------------------------
--- Procedimiento que traduce presentacion -> kg/caja reales y corrige
--- el renglon recien insertado en ventas
+-- Procedimiento que deja la auditoria de pesaje (bruto/tara/neto) del
+-- renglon de ventas que ya vino marcado con una presentacion. Ya NO
+-- recalcula kilos/cajas/codigo -- eso lo hace Delphi (CAJ_PROExit /
+-- ProcesaBundle en JUNTA.pas) antes de insertar. Todos los parametros
+-- llevan el prefijo p_ a proposito: si se llamaran igual que las
+-- columnas de ventas, cualquier WHERE/SELECT contra ventas dentro de
+-- este procedimiento se leeria como columna=columna (siempre verdadero)
+-- en vez de columna=parametro.
 --------------------------------------------------------------------------
 CREATE PROCEDURE "informix".sp_aplica_presentacion_venta(
-  emp CHAR(2), folio CHAR(10), renglon SMALLINT, art CHAR(14),
-  cajascap DECIMAL(10,4), kiloscap DECIMAL(10,4), suc CHAR(20), tipodoc CHAR(2))
+  p_idpres INTEGER, p_emp CHAR(2), p_folio CHAR(10), p_renglon SMALLINT,
+  p_art CHAR(14), p_cajascap DECIMAL(10,4), p_kiloscap DECIMAL(10,4),
+  p_suc CHAR(20), p_tipodoc CHAR(2))
 
-  DEFINE idpres     INTEGER;
-  DEFINE codreal    CHAR(14);
-  DEFINE factor     DECIMAL(12,6);
-  DEFINE tara       DECIMAL(8,4);
-  DEFINE variable   CHAR(1);
-  DEFINE cantcap    DECIMAL(12,4);
-  DEFINE canemp     DECIMAL(10,4);
-  DEFINE pesoneto   DECIMAL(12,4);
-  DEFINE cajasfinal DECIMAL(12,4);
-
-  SELECT id_presentacion INTO idpres FROM ventas
-   WHERE num_emp = emp AND folio = folio AND renglon = renglon;
-
-  IF idpres IS NULL THEN
-     RETURN;  -- renglon capturado sin pasar por el selector: no se toca
+  IF (p_idpres IS NULL) OR (p_idpres = 0) THEN
+     RETURN;  -- renglon sin presentacion marcada: no se toca
   END IF;
 
-  SELECT cod_art_legacy, factor_a_base, tara_kg, es_variable
-    INTO codreal, factor, tara, variable
-    FROM art_presentacion WHERE id_presentacion = idpres;
-
-  LET cantcap = cajascap;
-  IF cantcap = 0 THEN LET cantcap = kiloscap; END IF;
-
-  IF variable = "S" THEN
-     LET pesoneto = cantcap - tara;
-  ELSE
-     LET pesoneto = cantcap * factor;
-  END IF;
-
-  SELECT can_emp INTO canemp FROM inarinv WHERE num_emp = emp AND cod_art = codreal;
-  IF canemp > 0 THEN LET cajasfinal = pesoneto / canemp; ELSE LET cajasfinal = 0; END IF;
-
-  UPDATE ventas SET codigo = codreal, kilos = pesoneto, cajas = cajasfinal
-   WHERE ventas.num_emp = emp AND ventas.folio = folio AND ventas.renglon = renglon;
-
-  INSERT INTO inartrinv_peso VALUES (emp, codreal, suc, TODAY, tipodoc, folio,
-        idpres, cantcap, tara, pesoneto);
+  INSERT INTO inartrinv_peso VALUES (p_emp, p_art, p_suc, TODAY, p_tipodoc,
+        p_folio, p_idpres, p_cajascap, 0, p_kiloscap);
 
 END PROCEDURE;
 
 --------------------------------------------------------------------------
--- Trigger que dispara el procedimiento en cada INSERT a ventas
+-- Dos triggers, no uno: Delphi inserta el renglon en ventas SIN
+-- id_presentacion (todavia no se sabe si va a haber match) y lo marca
+-- despues con un UPDATE aparte (qmarcapresentacion.ExecSQL). Un trigger
+-- de solo INSERT nunca se vuelve a disparar con ese UPDATE posterior,
+-- por eso hace falta el segundo trigger sobre "UPDATE OF
+-- id_presentacion" -- es el que de verdad dispara la auditoria en la
+-- practica. El de INSERT se deja por si algun dia se llega a insertar
+-- ya con id_presentacion resuelto de una vez.
 --------------------------------------------------------------------------
 CREATE TRIGGER "informix".tr_ventas_presentacion INSERT ON "informix".ventas
 REFERENCING NEW AS n
 FOR EACH ROW
 (
   EXECUTE PROCEDURE "informix".sp_aplica_presentacion_venta(
-     n.num_emp, n.folio, n.renglon, n.codigo, n.cajas, n.kilos,
-     n.sucursal, n.tipo)
+     n.id_presentacion, n.num_emp, n.folio, n.renglon, n.codigo,
+     n.cajas, n.kilos, n.sucursal, n.tipo)
 );
 
---------------------------------------------------------------------------
--- Recordatorio: prueba primero en tu copia de desarrollo el UPDATE sobre
--- ventas disparado desde el propio trigger de insercion sobre esa misma
--- tabla (ver conversacion previa) antes de aplicar esto en produccion.
+CREATE TRIGGER "informix".tr_ventas_presentacion_upd UPDATE OF id_presentacion
+ON "informix".ventas
+REFERENCING NEW AS n
+FOR EACH ROW
+(
+  EXECUTE PROCEDURE "informix".sp_aplica_presentacion_venta(
+     n.id_presentacion, n.num_emp, n.folio, n.renglon, n.codigo,
+     n.cajas, n.kilos, n.sucursal, n.tipo)
+);
 --------------------------------------------------------------------------
