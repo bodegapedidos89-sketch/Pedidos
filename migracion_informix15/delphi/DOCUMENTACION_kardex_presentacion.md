@@ -108,14 +108,31 @@ sp_ajusta_existencia_base(emp, suc, codart, fech, tipdoc, numdoc, ren,
                            deltabase, costouni)
 ```
 
-Mismo mecanismo de auto-filtro y mismo cálculo de costo/existencia que
-`sp_aplica_mov_kardex`, pero para cuando el llamador **ya** tiene la
-diferencia en unidad base (kg) y no tiene sentido pasar por el
-factor/tara de una presentación específica — el caso de "Aplicar
-diferencias de inventario físico" en `UCierreDiario.pas`, donde se
-compara directamente kg contra kg. `deltabase` positivo = entra,
-negativo = sale. No toca `can_emp` (eso sigue siendo exclusivo de una
-recepción real con una presentación elegida).
+Mismo cálculo de costo/existencia que `sp_aplica_mov_kardex`, pero para
+cuando el llamador **ya** tiene la diferencia en unidad base (kg) y no
+tiene sentido pasar por el factor/tara de una presentación específica —
+el caso de "Aplicar diferencias de inventario físico" en
+`UCierreDiario.pas`, donde se compara directamente kg contra kg.
+`deltabase` positivo = entra, negativo = sale. No toca `can_emp` (eso
+sigue siendo exclusivo de una recepción real con una presentación
+elegida).
+
+La búsqueda inversa de este procedimiento acepta que `codart` sea el
+**código ancla directamente**, no solo un `cod_art_legacy`:
+
+```sql
+WHERE num_emp = emp AND activo = "S"
+  AND (cod_art_legacy = codart OR cod_art_ancla = codart)
+```
+
+Esto importa porque, como explicó el usuario, **el conteo físico
+registra el producto, no una presentación** — quien cuenta inventario ve
+"melón", no decide si es la presentación caja/kg/pieza. Es esperable que
+`inv_diario.cod_art` termine trayendo el propio código ancla para un
+producto ya migrado, no el código legacy de una presentación puntual. Si
+la búsqueda inversa solo aceptara `cod_art_legacy`, un ancla que no esté
+registrada a sí misma como presentación de nada se habría quedado sin
+resolver — el ajuste se hubiera saltado en silencio.
 
 ## 3. Dónde se conecta
 
@@ -161,12 +178,25 @@ spAplicaMovKardex.ExecProc;
 
 ### 3.3 `UCierreDiario.pas`
 
-- **"Aplicar diferencias de inventario físico"**: además de las llamadas
-  ya existentes a `inserta_tr_entdiv`/`inserta_tr_saldiv` (que siguen
-  igual, por si algo más lee `inartrinv`), ahora también llama a
-  `sp_ajusta_existencia_base` con `deltabase := difKgs` (la diferencia
-  ya está en kg, que es la unidad base) — una sola llamada
-  incondicional, sin ramas por tipo de artículo.
+- **"Aplicar diferencias de inventario físico"**: por cada código de
+  `inv_diario`, primero pregunta si ese código (como ancla o como
+  legacy) ya está en `art_presentacion`:
+  - **Migrado**: compara `SUM(can_kgs)` de `inv_diario` contra
+    `art_existencia.existencia_base` **directamente** (no contra
+    `inarinv` — que para un código legacy que no sea el propio ancla
+    puede estar congelado desde antes de la migración) y, si hay
+    diferencia, llama únicamente a `sp_ajusta_existencia_base` con
+    `deltabase := difKgs`. No se llama a `inserta_tr_entdiv`/
+    `inserta_tr_saldiv` para estos — su Kardex de auditoría ya es
+    `art_kardex_mov`, no `inartrinv`.
+  - **No migrado**: exactamente el flujo original, comparando contra
+    `inarinv.exi_cor_kgs/exi_cor_caj` y usando
+    `inserta_tr_entdiv`/`inserta_tr_saldiv`.
+  - Los contadores de renglón (y por lo tanto los folios/encabezados
+    `inserta_entdiv`/`inserta_saldiv` en `inardiverso`) son
+    independientes entre los dos caminos, para no generar un encabezado
+    de entrada/salida diversa sin ningún renglón real en `inartrinv`
+    cuando todo lo que se ajustó ese día fueron artículos migrados.
 - **"Recalcular Kardex completo"** (`sp_cierre_recalcula_kardex`): se le
   agregó un filtro al inicio del recorrido —
 

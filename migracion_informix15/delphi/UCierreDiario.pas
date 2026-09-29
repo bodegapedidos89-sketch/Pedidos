@@ -140,10 +140,10 @@ end;
 
 procedure TFormCierreDiario.btnAplicaDiferenciasClick(Sender: TObject);
 var
-  folioEnt, folioSal, renEnt, renSal: Integer;
+  folioEnt, folioSal, renEnt, renSal, renEntNuevo, renSalNuevo: Integer;
   difKgs, difCaj, exiKgs, exiCaj, cosKgs, cosCaj: Double;
-  tipArt, codArt, concepto: string;
-  esEntrada: Boolean;
+  tipArt, codArt, codAncla, concepto: string;
+  esEntrada, esMigrado: Boolean;
 begin
   // compara lo contado en inv_diario (terminal portatil) contra la
   // existencia VIGENTE en inarinv, y registra la diferencia como una
@@ -192,99 +192,153 @@ begin
 
   renEnt := 0;
   renSal := 0;
+  renEntNuevo := 0;
+  renSalNuevo := 0;
   concepto := 'AJUSTE INV FISICO CIERRE ' + DateToStr(dtFecha.Date);
 
   while not qDifFisico.Eof do
   begin
     codArt := Trim(qDifFisico.FieldByName('cod_art').AsString);
 
+    // el conteo fisico registra EL PRODUCTO, no una presentacion en
+    // especifico -- por eso codArt puede ser directamente el codigo
+    // ancla o el legacy de alguna presentacion puntual, segun como lo
+    // haya bajado la terminal portatil. Se acepta cualquiera de los dos.
     qArtCierre.Close;
     qArtCierre.SQL.Text :=
-      'SELECT exi_cor_kgs, exi_cor_caj, tip_art, cos_pro_kgs, cos_pro_caj FROM inarinv ' +
-      'WHERE num_emp = :emp AND cod_art = :art';
+      'SELECT cod_art_ancla FROM art_presentacion ' +
+      'WHERE num_emp = :emp AND activo = ''S'' ' +
+      'AND (cod_art_legacy = :art OR cod_art_ancla = :art)';
     qArtCierre.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
     qArtCierre.ParamByName('art').AsString := codArt;
     qArtCierre.Open;
+    esMigrado := not qArtCierre.Eof;
+    if esMigrado then
+      codAncla := Trim(qArtCierre.FieldByName('cod_art_ancla').AsString);
+    qArtCierre.Close;
 
-    if not qArtCierre.Eof then
+    if esMigrado then
     begin
-      exiKgs := qArtCierre.FieldByName('exi_cor_kgs').AsFloat;
-      exiCaj := qArtCierre.FieldByName('exi_cor_caj').AsFloat;
-      tipArt := Trim(qArtCierre.FieldByName('tip_art').AsString);
-      cosKgs := qArtCierre.FieldByName('cos_pro_kgs').AsFloat;
-      cosCaj := qArtCierre.FieldByName('cos_pro_caj').AsFloat;
+      // MIGRADO: se compara contra la existencia REAL en art_existencia
+      // (ya unificada, en kg), no contra inarinv -- que para un codigo
+      // legacy que no sea el propio ancla puede estar congelado.
+      qArtCierre.Close;
+      qArtCierre.SQL.Text :=
+        'SELECT existencia_base, costo_prom_base FROM art_existencia ' +
+        'WHERE num_emp = :emp AND cod_art_ancla = :anc';
+      qArtCierre.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+      qArtCierre.ParamByName('anc').AsString := codAncla;
+      qArtCierre.Open;
+      if not qArtCierre.Eof then
+      begin
+        exiKgs := qArtCierre.FieldByName('existencia_base').AsFloat;
+        cosKgs := qArtCierre.FieldByName('costo_prom_base').AsFloat;
+      end
+      else
+      begin
+        exiKgs := 0;
+        cosKgs := 0;
+      end;
       qArtCierre.Close;
 
       difKgs := qDifFisico.FieldByName('fis_kgs').AsFloat - exiKgs;
-      difCaj := qDifFisico.FieldByName('fis_caj').AsFloat - exiCaj;
 
-      if (difKgs <> 0) or (difCaj <> 0) then
+      if difKgs <> 0 then
       begin
-        if tipArt = 'K' then
-          esEntrada := difKgs >= 0
-        else
-          esEntrada := difCaj >= 0;
-
+        esEntrada := difKgs >= 0;
         if esEntrada then
         begin
-          Inc(renEnt);
-          spInsertaTrEntDiv.Close;
-          spInsertaTrEntDiv.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
-          spInsertaTrEntDiv.ParamByName('suc').AsString := Trim(edtEmpresa.Text);
-          spInsertaTrEntDiv.ParamByName('art').AsString := codArt;
-          spInsertaTrEntDiv.ParamByName('doc').AsInteger := folioEnt;
-          spInsertaTrEntDiv.ParamByName('fech').AsDateTime := dtFecha.Date;
-          spInsertaTrEntDiv.ParamByName('kgs').AsFloat := difKgs;
-          spInsertaTrEntDiv.ParamByName('caj').AsFloat := difCaj;
-          spInsertaTrEntDiv.ParamByName('cosprokgs').AsFloat := cosKgs;
-          spInsertaTrEntDiv.ParamByName('cosprocaj').AsFloat := cosCaj;
-          spInsertaTrEntDiv.ParamByName('ren').AsInteger := renEnt;
-          spInsertaTrEntDiv.ExecProc;
+          Inc(renEntNuevo);
+          spAjustaExistenciaBase.ParamByName('tipdoc').AsString := 'ED';
+          spAjustaExistenciaBase.ParamByName('numdoc').AsString := IntToStr(folioEnt);
+          spAjustaExistenciaBase.ParamByName('ren').AsInteger := renEntNuevo;
         end
         else
         begin
-          Inc(renSal);
-          spInsertaTrSalDiv.Close;
-          spInsertaTrSalDiv.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
-          spInsertaTrSalDiv.ParamByName('suc').AsString := Trim(edtEmpresa.Text);
-          spInsertaTrSalDiv.ParamByName('art').AsString := codArt;
-          spInsertaTrSalDiv.ParamByName('doc').AsInteger := folioSal;
-          spInsertaTrSalDiv.ParamByName('fech').AsDateTime := dtFecha.Date;
-          spInsertaTrSalDiv.ParamByName('kgs').AsFloat := -difKgs;
-          spInsertaTrSalDiv.ParamByName('caj').AsFloat := -difCaj;
-          spInsertaTrSalDiv.ParamByName('cosprokgs').AsFloat := cosKgs;
-          spInsertaTrSalDiv.ParamByName('cosprocaj').AsFloat := cosCaj;
-          spInsertaTrSalDiv.ParamByName('ren').AsInteger := renSal;
-          spInsertaTrSalDiv.ExecProc;
+          Inc(renSalNuevo);
+          spAjustaExistenciaBase.ParamByName('tipdoc').AsString := 'SD';
+          spAjustaExistenciaBase.ParamByName('numdoc').AsString := IntToStr(folioSal);
+          spAjustaExistenciaBase.ParamByName('ren').AsInteger := renSalNuevo;
         end;
 
-        // motor de Kardex por producto unificado: difKgs ya esta en la
-        // unidad base (kg), no hace falta convertir por presentacion.
-        // Solo aplica si codArt esta dado de alta en art_presentacion.
         spAjustaExistenciaBase.Close;
         spAjustaExistenciaBase.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
         spAjustaExistenciaBase.ParamByName('suc').AsString := Trim(edtEmpresa.Text);
         spAjustaExistenciaBase.ParamByName('codart').AsString := codArt;
         spAjustaExistenciaBase.ParamByName('fech').AsDateTime := dtFecha.Date;
-        if esEntrada then
-        begin
-          spAjustaExistenciaBase.ParamByName('tipdoc').AsString := 'ED';
-          spAjustaExistenciaBase.ParamByName('numdoc').AsString := IntToStr(folioEnt);
-          spAjustaExistenciaBase.ParamByName('ren').AsInteger := renEnt;
-        end
-        else
-        begin
-          spAjustaExistenciaBase.ParamByName('tipdoc').AsString := 'SD';
-          spAjustaExistenciaBase.ParamByName('numdoc').AsString := IntToStr(folioSal);
-          spAjustaExistenciaBase.ParamByName('ren').AsInteger := renSal;
-        end;
         spAjustaExistenciaBase.ParamByName('deltabase').AsFloat := difKgs;
         spAjustaExistenciaBase.ParamByName('costouni').AsFloat := cosKgs;
         spAjustaExistenciaBase.ExecProc;
       end;
     end
     else
+    begin
+      // NO migrado: exactamente el mismo flujo legacy de siempre,
+      // comparando contra inarinv y usando entrada/salida diversa
       qArtCierre.Close;
+      qArtCierre.SQL.Text :=
+        'SELECT exi_cor_kgs, exi_cor_caj, tip_art, cos_pro_kgs, cos_pro_caj FROM inarinv ' +
+        'WHERE num_emp = :emp AND cod_art = :art';
+      qArtCierre.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+      qArtCierre.ParamByName('art').AsString := codArt;
+      qArtCierre.Open;
+
+      if not qArtCierre.Eof then
+      begin
+        exiKgs := qArtCierre.FieldByName('exi_cor_kgs').AsFloat;
+        exiCaj := qArtCierre.FieldByName('exi_cor_caj').AsFloat;
+        tipArt := Trim(qArtCierre.FieldByName('tip_art').AsString);
+        cosKgs := qArtCierre.FieldByName('cos_pro_kgs').AsFloat;
+        cosCaj := qArtCierre.FieldByName('cos_pro_caj').AsFloat;
+        qArtCierre.Close;
+
+        difKgs := qDifFisico.FieldByName('fis_kgs').AsFloat - exiKgs;
+        difCaj := qDifFisico.FieldByName('fis_caj').AsFloat - exiCaj;
+
+        if (difKgs <> 0) or (difCaj <> 0) then
+        begin
+          if tipArt = 'K' then
+            esEntrada := difKgs >= 0
+          else
+            esEntrada := difCaj >= 0;
+
+          if esEntrada then
+          begin
+            Inc(renEnt);
+            spInsertaTrEntDiv.Close;
+            spInsertaTrEntDiv.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+            spInsertaTrEntDiv.ParamByName('suc').AsString := Trim(edtEmpresa.Text);
+            spInsertaTrEntDiv.ParamByName('art').AsString := codArt;
+            spInsertaTrEntDiv.ParamByName('doc').AsInteger := folioEnt;
+            spInsertaTrEntDiv.ParamByName('fech').AsDateTime := dtFecha.Date;
+            spInsertaTrEntDiv.ParamByName('kgs').AsFloat := difKgs;
+            spInsertaTrEntDiv.ParamByName('caj').AsFloat := difCaj;
+            spInsertaTrEntDiv.ParamByName('cosprokgs').AsFloat := cosKgs;
+            spInsertaTrEntDiv.ParamByName('cosprocaj').AsFloat := cosCaj;
+            spInsertaTrEntDiv.ParamByName('ren').AsInteger := renEnt;
+            spInsertaTrEntDiv.ExecProc;
+          end
+          else
+          begin
+            Inc(renSal);
+            spInsertaTrSalDiv.Close;
+            spInsertaTrSalDiv.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+            spInsertaTrSalDiv.ParamByName('suc').AsString := Trim(edtEmpresa.Text);
+            spInsertaTrSalDiv.ParamByName('art').AsString := codArt;
+            spInsertaTrSalDiv.ParamByName('doc').AsInteger := folioSal;
+            spInsertaTrSalDiv.ParamByName('fech').AsDateTime := dtFecha.Date;
+            spInsertaTrSalDiv.ParamByName('kgs').AsFloat := -difKgs;
+            spInsertaTrSalDiv.ParamByName('caj').AsFloat := -difCaj;
+            spInsertaTrSalDiv.ParamByName('cosprokgs').AsFloat := cosKgs;
+            spInsertaTrSalDiv.ParamByName('cosprocaj').AsFloat := cosCaj;
+            spInsertaTrSalDiv.ParamByName('ren').AsInteger := renSal;
+            spInsertaTrSalDiv.ExecProc;
+          end;
+        end;
+      end
+      else
+        qArtCierre.Close;
+    end;
 
     qDifFisico.Next;
   end;
@@ -314,8 +368,11 @@ begin
     spInsertaSalDiv.ExecProc;
   end;
 
-  ShowMessage('Diferencias aplicadas: ' + IntToStr(renEnt) + ' entradas diversas, ' +
-    IntToStr(renSal) + ' salidas diversas.');
+  ShowMessage('Diferencias aplicadas.' + #13#10 +
+    'Articulos NO migrados (inarinv/inartrinv): ' + IntToStr(renEnt) + ' entradas, ' +
+    IntToStr(renSal) + ' salidas.' + #13#10 +
+    'Articulos migrados (art_existencia): ' + IntToStr(renEntNuevo) + ' entradas, ' +
+    IntToStr(renSalNuevo) + ' salidas.');
 end;
 
 end.

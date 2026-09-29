@@ -232,13 +232,18 @@ CREATE PROCEDURE "informix".sp_ajusta_existencia_base(
 
   LET codancla = NULL;
 
-  -- solo se necesita el ancla y un factor de referencia para espejar
-  -- exi_cor_caj en inarinv; deltabase ya viene en unidad base, no se
-  -- vuelve a convertir
+  -- el conteo fisico registra EL PRODUCTO, no una presentacion
+  -- especifica -- por eso codart puede llegar aqui siendo directamente
+  -- el cod_art_ancla (lo que se contó) o el cod_art_legacy de alguna
+  -- presentacion puntual, segun como quede armado inv_diario. Se
+  -- aceptan los dos: solo se necesita el ancla y un factor de
+  -- referencia para espejar exi_cor_caj en inarinv; deltabase ya viene
+  -- en unidad base, no se vuelve a convertir.
   SELECT FIRST 1 id_presentacion, cod_art_ancla, factor_a_base
     INTO idpres, codancla, factor
     FROM art_presentacion
-   WHERE num_emp = emp AND cod_art_legacy = codart AND activo = "S";
+   WHERE num_emp = emp AND activo = "S"
+     AND (cod_art_legacy = codart OR cod_art_ancla = codart);
 
   IF codancla IS NULL THEN
      RETURN;  -- articulo no migrado a presentaciones
