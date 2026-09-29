@@ -32,10 +32,21 @@ type
     qOper: TQuery;
     spDetectaNegativos: TStoredProc;
     spRecalculaKardex: TStoredProc;
+    gbFisico: TGroupBox;
+    lblFisicoNota: TLabel;
+    btnAplicaDiferencias: TButton;
+    qDifFisico: TQuery;
+    qArtCierre: TQuery;
+    qFolio: TQuery;
+    spInsertaEntDiv: TStoredProc;
+    spInsertaTrEntDiv: TStoredProc;
+    spInsertaSalDiv: TStoredProc;
+    spInsertaTrSalDiv: TStoredProc;
     procedure FormCreate(Sender: TObject);
     procedure btnDetectaNegativosClick(Sender: TObject);
     procedure btnRecalculaClick(Sender: TObject);
     procedure btnVerTendenciasClick(Sender: TObject);
+    procedure btnAplicaDiferenciasClick(Sender: TObject);
   private
     procedure CargaNegativosHoy;
     procedure CargaLogCierre;
@@ -124,6 +135,162 @@ begin
   finally
     FormReporteNegativos.Free;
   end;
+end;
+
+procedure TFormCierreDiario.btnAplicaDiferenciasClick(Sender: TObject);
+var
+  folioEnt, folioSal, renEnt, renSal: Integer;
+  difKgs, difCaj, exiKgs, exiCaj, cosKgs, cosCaj: Double;
+  tipArt, codArt, concepto: string;
+  esEntrada: Boolean;
+begin
+  // compara lo contado en inv_diario (terminal portatil) contra la
+  // existencia VIGENTE en inarinv, y registra la diferencia como una
+  // entrada o salida diversa usando exactamente el mismo mecanismo que ya
+  // usa el sistema (inserta_entdiv/inserta_tr_entdiv y sus pares de
+  // salida) -- no se inventa un movimiento nuevo. No toca can_emp: eso
+  // solo se actualiza al recibir mercancia (UOCRecepcion).
+  if MessageDlg(
+       'Esto compara lo contado en inv_diario contra la existencia actual en inarinv ' +
+       'para el ' + DateToStr(dtFecha.Date) + ' y REGISTRA una entrada/salida diversa ' +
+       '(ED/SD) en el Kardex por cada diferencia.' + #13#10#13#10 +
+       'No toca can_emp. Si vuelves a correrlo, solo aplica lo que siga sin cuadrar ' +
+       '(compara contra la existencia ya actualizada). Continuar?',
+       mtWarning, [mbYes, mbNo], 0) <> mrYes then
+    Exit;
+
+  qDifFisico.Close;
+  qDifFisico.SQL.Text :=
+    'SELECT cod_art, SUM(can_kgs) fis_kgs, SUM(can_caj) fis_caj FROM inv_diario ' +
+    'WHERE num_emp = :emp AND fecha = :fecha GROUP BY cod_art';
+  qDifFisico.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+  qDifFisico.ParamByName('fecha').AsDateTime := dtFecha.Date;
+  qDifFisico.Open;
+
+  if qDifFisico.IsEmpty then
+  begin
+    ShowMessage('No hay conteo fisico (inv_diario) capturado para esa fecha');
+    qDifFisico.Close;
+    Exit;
+  end;
+
+  // folio propio de este ajuste (independiente del que usa formato.pas
+  // para el "terreno", que corre en otras empresas)
+  qFolio.Close;
+  qFolio.SQL.Text := 'SELECT MAX(num_doc) maxdoc FROM inartrinv WHERE num_emp = :emp AND tip_doc = ''ED''';
+  qFolio.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+  qFolio.Open;
+  folioEnt := qFolio.FieldByName('maxdoc').AsInteger + 1;
+  qFolio.Close;
+
+  qFolio.SQL.Text := 'SELECT MAX(num_doc) maxdoc FROM inartrinv WHERE num_emp = :emp AND tip_doc = ''SD''';
+  qFolio.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+  qFolio.Open;
+  folioSal := qFolio.FieldByName('maxdoc').AsInteger + 1;
+  qFolio.Close;
+
+  renEnt := 0;
+  renSal := 0;
+  concepto := 'AJUSTE INV FISICO CIERRE ' + DateToStr(dtFecha.Date);
+
+  while not qDifFisico.Eof do
+  begin
+    codArt := Trim(qDifFisico.FieldByName('cod_art').AsString);
+
+    qArtCierre.Close;
+    qArtCierre.SQL.Text :=
+      'SELECT exi_cor_kgs, exi_cor_caj, tip_art, cos_pro_kgs, cos_pro_caj FROM inarinv ' +
+      'WHERE num_emp = :emp AND cod_art = :art';
+    qArtCierre.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+    qArtCierre.ParamByName('art').AsString := codArt;
+    qArtCierre.Open;
+
+    if not qArtCierre.Eof then
+    begin
+      exiKgs := qArtCierre.FieldByName('exi_cor_kgs').AsFloat;
+      exiCaj := qArtCierre.FieldByName('exi_cor_caj').AsFloat;
+      tipArt := Trim(qArtCierre.FieldByName('tip_art').AsString);
+      cosKgs := qArtCierre.FieldByName('cos_pro_kgs').AsFloat;
+      cosCaj := qArtCierre.FieldByName('cos_pro_caj').AsFloat;
+      qArtCierre.Close;
+
+      difKgs := qDifFisico.FieldByName('fis_kgs').AsFloat - exiKgs;
+      difCaj := qDifFisico.FieldByName('fis_caj').AsFloat - exiCaj;
+
+      if (difKgs <> 0) or (difCaj <> 0) then
+      begin
+        if tipArt = 'K' then
+          esEntrada := difKgs >= 0
+        else
+          esEntrada := difCaj >= 0;
+
+        if esEntrada then
+        begin
+          Inc(renEnt);
+          spInsertaTrEntDiv.Close;
+          spInsertaTrEntDiv.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+          spInsertaTrEntDiv.ParamByName('suc').AsString := Trim(edtEmpresa.Text);
+          spInsertaTrEntDiv.ParamByName('art').AsString := codArt;
+          spInsertaTrEntDiv.ParamByName('doc').AsInteger := folioEnt;
+          spInsertaTrEntDiv.ParamByName('fech').AsDateTime := dtFecha.Date;
+          spInsertaTrEntDiv.ParamByName('kgs').AsFloat := difKgs;
+          spInsertaTrEntDiv.ParamByName('caj').AsFloat := difCaj;
+          spInsertaTrEntDiv.ParamByName('cosprokgs').AsFloat := cosKgs;
+          spInsertaTrEntDiv.ParamByName('cosprocaj').AsFloat := cosCaj;
+          spInsertaTrEntDiv.ParamByName('ren').AsInteger := renEnt;
+          spInsertaTrEntDiv.ExecProc;
+        end
+        else
+        begin
+          Inc(renSal);
+          spInsertaTrSalDiv.Close;
+          spInsertaTrSalDiv.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+          spInsertaTrSalDiv.ParamByName('suc').AsString := Trim(edtEmpresa.Text);
+          spInsertaTrSalDiv.ParamByName('art').AsString := codArt;
+          spInsertaTrSalDiv.ParamByName('doc').AsInteger := folioSal;
+          spInsertaTrSalDiv.ParamByName('fech').AsDateTime := dtFecha.Date;
+          spInsertaTrSalDiv.ParamByName('kgs').AsFloat := -difKgs;
+          spInsertaTrSalDiv.ParamByName('caj').AsFloat := -difCaj;
+          spInsertaTrSalDiv.ParamByName('cosprokgs').AsFloat := cosKgs;
+          spInsertaTrSalDiv.ParamByName('cosprocaj').AsFloat := cosCaj;
+          spInsertaTrSalDiv.ParamByName('ren').AsInteger := renSal;
+          spInsertaTrSalDiv.ExecProc;
+        end;
+      end;
+    end
+    else
+      qArtCierre.Close;
+
+    qDifFisico.Next;
+  end;
+  qDifFisico.Close;
+
+  if renEnt > 0 then
+  begin
+    spInsertaEntDiv.Close;
+    spInsertaEntDiv.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+    spInsertaEntDiv.ParamByName('suc').AsString := Trim(edtEmpresa.Text);
+    spInsertaEntDiv.ParamByName('doc').AsInteger := folioEnt;
+    spInsertaEntDiv.ParamByName('fech').AsDateTime := dtFecha.Date;
+    spInsertaEntDiv.ParamByName('imp').AsFloat := 0;
+    spInsertaEntDiv.ParamByName('concept').AsString := concepto;
+    spInsertaEntDiv.ExecProc;
+  end;
+
+  if renSal > 0 then
+  begin
+    spInsertaSalDiv.Close;
+    spInsertaSalDiv.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+    spInsertaSalDiv.ParamByName('suc').AsString := Trim(edtEmpresa.Text);
+    spInsertaSalDiv.ParamByName('doc').AsInteger := folioSal;
+    spInsertaSalDiv.ParamByName('fech').AsDateTime := dtFecha.Date;
+    spInsertaSalDiv.ParamByName('imp').AsFloat := 0;
+    spInsertaSalDiv.ParamByName('concept').AsString := concepto;
+    spInsertaSalDiv.ExecProc;
+  end;
+
+  ShowMessage('Diferencias aplicadas: ' + IntToStr(renEnt) + ' entradas diversas, ' +
+    IntToStr(renSal) + ' salidas diversas.');
 end;
 
 end.

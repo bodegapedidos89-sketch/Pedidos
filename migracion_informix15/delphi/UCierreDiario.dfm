@@ -2,7 +2,7 @@ object FormCierreDiario: TFormCierreDiario
   Left = 150
   Top = 110
   Caption = 'Cierre Diario'
-  ClientHeight = 560
+  ClientHeight = 630
   ClientWidth = 700
   Position = poScreenCenter
   OnCreate = FormCreate
@@ -12,7 +12,7 @@ object FormCierreDiario: TFormCierreDiario
     Left = 8
     Top = 8
     Width = 684
-    Height = 544
+    Height = 614
     BevelOuter = bvNone
     object lblEmpresa: TLabel
       Left = 0
@@ -30,14 +30,14 @@ object FormCierreDiario: TFormCierreDiario
     end
     object lblNegativosHoy: TLabel
       Left = 0
-      Top = 220
+      Top = 312
       Width = 260
       Height = 13
       Caption = 'Articulos con existencia negativa en este cierre'
     end
     object lblLogCierre: TLabel
       Left = 0
-      Top = 400
+      Top = 460
       Width = 220
       Height = 13
       Caption = 'Bitacora del ultimo recalculo (hist_log_cierre)'
@@ -106,25 +106,54 @@ object FormCierreDiario: TFormCierreDiario
         OnClick = btnRecalculaClick
       end
     end
+    object gbFisico: TGroupBox
+      Left = 0
+      Top = 214
+      Width = 684
+      Height = 90
+      Caption = 'Inventario fisico (inv_diario) vs sistema'
+      object lblFisicoNota: TLabel
+        Left = 16
+        Top = 24
+        Width = 620
+        Height = 32
+        AutoSize = False
+        WordWrap = True
+        Caption =
+          'Compara lo contado por la terminal portatil (inv_diario) contr' +
+          'a la existencia vigente en inarinv para la fecha de arriba, y ' +
+          'registra la diferencia como entrada/salida diversa en el Karde' +
+          'x. No toca can_emp.'
+      end
+      object btnAplicaDiferencias: TButton
+        Left = 16
+        Top = 60
+        Width = 300
+        Height = 23
+        Caption = 'Aplicar diferencias de inventario fisico'
+        TabOrder = 0
+        OnClick = btnAplicaDiferenciasClick
+      end
+    end
     object dbgNegativosHoy: TDBGrid
       Left = 0
-      Top = 238
+      Top = 330
       Width = 684
-      Height = 150
+      Height = 120
       DataSource = dsNegativosHoy
       TabOrder = 3
     end
     object dbgLogCierre: TDBGrid
       Left = 0
-      Top = 418
+      Top = 478
       Width = 684
-      Height = 100
+      Height = 90
       DataSource = dsLogCierre
       TabOrder = 4
     end
     object btnVerTendencias: TButton
       Left = 0
-      Top = 520
+      Top = 576
       Width = 220
       Height = 23
       Caption = 'Ver reporte de tendencias...'
@@ -206,6 +235,209 @@ object FormCierreDiario: TFormCierreDiario
       item
         DataType = ftDate
         Name = 'fech_fin'
+        ParamType = ptInput
+      end>
+  end
+  object qDifFisico: TQuery
+    DatabaseName = 'comyleg'
+    Left = 648
+    Top = 48
+  end
+  object qArtCierre: TQuery
+    DatabaseName = 'comyleg'
+    Left = 648
+    Top = 88
+  end
+  object qFolio: TQuery
+    DatabaseName = 'comyleg'
+    Left = 648
+    Top = 128
+  end
+  object spInsertaEntDiv: TStoredProc
+    DatabaseName = 'comyleg'
+    StoredProcName = 'inserta_entdiv'
+    Left = 648
+    Top = 168
+    ParamData = <
+      item
+        DataType = ftString
+        Name = 'emp'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'suc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftInteger
+        Name = 'doc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftDate
+        Name = 'fech'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'imp'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'concept'
+        ParamType = ptInput
+      end>
+  end
+  object spInsertaTrEntDiv: TStoredProc
+    DatabaseName = 'comyleg'
+    StoredProcName = 'inserta_tr_entdiv'
+    Left = 648
+    Top = 208
+    ParamData = <
+      item
+        DataType = ftString
+        Name = 'emp'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'suc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'art'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftInteger
+        Name = 'doc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftDate
+        Name = 'fech'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'kgs'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'caj'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'cosprokgs'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'cosprocaj'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftSmallint
+        Name = 'ren'
+        ParamType = ptInput
+      end>
+  end
+  object spInsertaSalDiv: TStoredProc
+    DatabaseName = 'comyleg'
+    StoredProcName = 'inserta_saldiv'
+    Left = 648
+    Top = 248
+    ParamData = <
+      item
+        DataType = ftString
+        Name = 'emp'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'suc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftInteger
+        Name = 'doc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftDate
+        Name = 'fech'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'imp'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'concept'
+        ParamType = ptInput
+      end>
+  end
+  object spInsertaTrSalDiv: TStoredProc
+    DatabaseName = 'comyleg'
+    StoredProcName = 'inserta_tr_saldiv'
+    Left = 648
+    Top = 288
+    ParamData = <
+      item
+        DataType = ftString
+        Name = 'emp'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'suc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'art'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftInteger
+        Name = 'doc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftDate
+        Name = 'fech'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'kgs'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'caj'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'cosprokgs'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'cosprocaj'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftSmallint
+        Name = 'ren'
         ParamType = ptInput
       end>
   end
