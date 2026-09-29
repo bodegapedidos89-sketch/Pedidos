@@ -42,6 +42,7 @@ type
     spInsertaTrEntDiv: TStoredProc;
     spInsertaSalDiv: TStoredProc;
     spInsertaTrSalDiv: TStoredProc;
+    spAjustaExistenciaBase: TStoredProc;
     procedure FormCreate(Sender: TObject);
     procedure btnDetectaNegativosClick(Sender: TObject);
     procedure btnRecalculaClick(Sender: TObject);
@@ -256,6 +257,30 @@ begin
           spInsertaTrSalDiv.ParamByName('ren').AsInteger := renSal;
           spInsertaTrSalDiv.ExecProc;
         end;
+
+        // motor de Kardex por producto unificado: difKgs ya esta en la
+        // unidad base (kg), no hace falta convertir por presentacion.
+        // Solo aplica si codArt esta dado de alta en art_presentacion.
+        spAjustaExistenciaBase.Close;
+        spAjustaExistenciaBase.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+        spAjustaExistenciaBase.ParamByName('suc').AsString := Trim(edtEmpresa.Text);
+        spAjustaExistenciaBase.ParamByName('codart').AsString := codArt;
+        spAjustaExistenciaBase.ParamByName('fech').AsDateTime := dtFecha.Date;
+        if esEntrada then
+        begin
+          spAjustaExistenciaBase.ParamByName('tipdoc').AsString := 'ED';
+          spAjustaExistenciaBase.ParamByName('numdoc').AsString := IntToStr(folioEnt);
+          spAjustaExistenciaBase.ParamByName('ren').AsInteger := renEnt;
+        end
+        else
+        begin
+          spAjustaExistenciaBase.ParamByName('tipdoc').AsString := 'SD';
+          spAjustaExistenciaBase.ParamByName('numdoc').AsString := IntToStr(folioSal);
+          spAjustaExistenciaBase.ParamByName('ren').AsInteger := renSal;
+        end;
+        spAjustaExistenciaBase.ParamByName('deltabase').AsFloat := difKgs;
+        spAjustaExistenciaBase.ParamByName('costouni').AsFloat := cosKgs;
+        spAjustaExistenciaBase.ExecProc;
       end;
     end
     else

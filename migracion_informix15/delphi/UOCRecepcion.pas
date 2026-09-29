@@ -39,6 +39,7 @@ type
     btnGuardarRecepcion: TButton;
     qOper: TQuery;
     spRecibeRenglon: TStoredProc;
+    spAplicaMovKardex: TStoredProc;
     procedure FormCreate(Sender: TObject);
     procedure btnBuscarPedidoClick(Sender: TObject);
     procedure dbgPedidosDblClick(Sender: TObject);
@@ -268,6 +269,21 @@ begin
     spRecibeRenglon.ParamByName('fle').AsFloat := 0;
     spRecibeRenglon.ParamByName('canempreal').AsFloat := cantXEmpaque;
     spRecibeRenglon.ExecProc;
+
+    // motor de Kardex por producto unificado: solo aplica si
+    // FCodArtActual ya esta dado de alta en art_presentacion
+    spAplicaMovKardex.Close;
+    spAplicaMovKardex.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
+    spAplicaMovKardex.ParamByName('suc').AsString := Trim(edtEmpresa.Text);
+    spAplicaMovKardex.ParamByName('codart').AsString := FCodArtActual;
+    spAplicaMovKardex.ParamByName('fech').AsDateTime := Date;
+    spAplicaMovKardex.ParamByName('tipdoc').AsString := 'AC';
+    spAplicaMovKardex.ParamByName('numdoc').AsString := IntToStr(FNumPedActual);
+    spAplicaMovKardex.ParamByName('ren').AsInteger := FRenglonActual;
+    spAplicaMovKardex.ParamByName('cantcap').AsFloat := cantRecibida;
+    spAplicaMovKardex.ParamByName('costouni').AsFloat := FCosUniActual;
+    spAplicaMovKardex.ParamByName('esentrada').AsString := 'S';
+    spAplicaMovKardex.ExecProc;
   end;
 
   // refresca renglones pendientes del pedido; si ya no queda ninguno,

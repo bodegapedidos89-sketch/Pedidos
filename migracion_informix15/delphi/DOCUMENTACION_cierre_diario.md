@@ -5,6 +5,14 @@ objetos nuevos en `06_cierre_diario.sql`. Cubre el cierre del día
 (recalculo de Kardex, detección de existencia negativa, aplicación de
 diferencias del inventario físico) y el reporte gráfico de tendencias.
 
+> **Actualización**: desde `07_kardex_por_presentacion.sql`, "Aplicar
+> diferencias de inventario físico" y "Recalcular Kardex completo" ya
+> conocen el motor de Kardex por producto unificado (existencia y costo
+> centralizados por `cod_art_ancla` en vez de por código legacy) — ver
+> `DOCUMENTACION_kardex_presentacion.md` para el detalle de ese motor y
+> de qué cambió exactamente en esos dos botones. "Cerrar el día" no
+> cambió: sigue funcionando igual gracias al espejo en `inarinv`.
+
 ## 1. Objetivo
 
 El sistema ya tenía tres procedimientos legacy que hacen un trabajo

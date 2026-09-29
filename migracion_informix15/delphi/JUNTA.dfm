@@ -12526,4 +12526,61 @@ object Form9: TForm9
         ParamType = ptInput
       end>
   end
+  object spAplicaMovKardex: TStoredProc
+    DatabaseName = 'comyleg'
+    StoredProcName = 'sp_aplica_mov_kardex'
+    Left = 776
+    Top = 224
+    ParamData = <
+      item
+        DataType = ftString
+        Name = 'emp'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'suc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'codart'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftDate
+        Name = 'fech'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'tipdoc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'numdoc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftSmallint
+        Name = 'ren'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'cantcap'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'costouni'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'esentrada'
+        ParamType = ptInput
+      end>
+  end
 end

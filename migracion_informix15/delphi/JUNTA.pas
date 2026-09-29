@@ -1828,6 +1828,7 @@ type
     qBuscaCanEmp: TQuery;
     qBuscaBundle: TQuery;
     qBundleDetalle: TQuery;
+    spAplicaMovKardex: TStoredProc;
     procedure FormShow(Sender: TObject);
     procedure inicializa;
     procedure factuExit(Sender: TObject);
@@ -3800,6 +3801,24 @@ begin
                         qmarcapresentacion.ParamByName('reng').AsInteger  := reng;
                         qmarcapresentacion.ParamByName('idpres').AsInteger := FIdPresentacionSel;
                         qmarcapresentacion.ExecSQL;
+
+                        // motor de Kardex por producto unificado: solo
+                        // aplica si codigoART.text ya esta dado de alta
+                        // en art_presentacion (si no, sp_aplica_mov_kardex
+                        // no hace nada y el articulo sigue viviendo
+                        // unicamente en inarinv, igual que siempre)
+                        spAplicaMovKardex.Close;
+                        spAplicaMovKardex.ParamByName('emp').AsString := NUM_EMPRESA.Text;
+                        spAplicaMovKardex.ParamByName('suc').AsString := CSUCURSAL.Text;
+                        spAplicaMovKardex.ParamByName('codart').AsString := codigoART.text;
+                        spAplicaMovKardex.ParamByName('fech').AsDateTime := Date;
+                        spAplicaMovKardex.ParamByName('tipdoc').AsString := 'VE';
+                        spAplicaMovKardex.ParamByName('numdoc').AsString := foliotmp;
+                        spAplicaMovKardex.ParamByName('ren').AsInteger := reng;
+                        spAplicaMovKardex.ParamByName('cantcap').AsFloat := StrToFloat(caj_pro.text);
+                        spAplicaMovKardex.ParamByName('costouni').AsFloat := 0;
+                        spAplicaMovKardex.ParamByName('esentrada').AsString := 'N';
+                        spAplicaMovKardex.ExecProc;
                       end;
 
 
@@ -4462,6 +4481,22 @@ begin
     qmarcapresentacion.ParamByName('reng').AsInteger  := reng;
     qmarcapresentacion.ParamByName('idpres').AsInteger:= qBundleDetalle.FieldByName('id_presentacion').AsInteger;
     qmarcapresentacion.ExecSQL;
+
+    // motor de Kardex por producto unificado, mismo mecanismo que la
+    // venta normal: si codLegacyComp no esta en art_presentacion no
+    // hace nada
+    spAplicaMovKardex.Close;
+    spAplicaMovKardex.ParamByName('emp').AsString := NUM_EMPRESA.Text;
+    spAplicaMovKardex.ParamByName('suc').AsString := CSUCURSAL.Text;
+    spAplicaMovKardex.ParamByName('codart').AsString := codLegacyComp;
+    spAplicaMovKardex.ParamByName('fech').AsDateTime := Date;
+    spAplicaMovKardex.ParamByName('tipdoc').AsString := 'VE';
+    spAplicaMovKardex.ParamByName('numdoc').AsString := tfolio.Text;
+    spAplicaMovKardex.ParamByName('ren').AsInteger := reng;
+    spAplicaMovKardex.ParamByName('cantcap').AsFloat := cantComp;
+    spAplicaMovKardex.ParamByName('costouni').AsFloat := 0;
+    spAplicaMovKardex.ParamByName('esentrada').AsString := 'N';
+    spAplicaMovKardex.ExecProc;
 
     TOTAL := FloatToStrF(importeComp, ffNumber, 10, 2);
     sacatotal;

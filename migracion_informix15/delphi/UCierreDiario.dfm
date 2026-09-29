@@ -441,4 +441,56 @@ object FormCierreDiario: TFormCierreDiario
         ParamType = ptInput
       end>
   end
+  object spAjustaExistenciaBase: TStoredProc
+    DatabaseName = 'comyleg'
+    StoredProcName = 'sp_ajusta_existencia_base'
+    Left = 680
+    Top = 328
+    ParamData = <
+      item
+        DataType = ftString
+        Name = 'emp'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'suc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'codart'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftDate
+        Name = 'fech'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'tipdoc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftString
+        Name = 'numdoc'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftSmallint
+        Name = 'ren'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'deltabase'
+        ParamType = ptInput
+      end
+      item
+        DataType = ftFloat
+        Name = 'costouni'
+        ParamType = ptInput
+      end>
+  end
 end

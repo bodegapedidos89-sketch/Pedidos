@@ -150,6 +150,20 @@ CREATE PROCEDURE "informix".sp_cierre_recalcula_kardex(
      WHERE inarinv.num_emp = emp
      ORDER BY cod_art
 
+    -- articulo migrado al motor nuevo (07_kardex_por_presentacion.sql):
+    -- su existencia/costo vive en art_existencia y se mantiene con
+    -- sp_aplica_mov_kardex/sp_ajusta_existencia_base en cada movimiento;
+    -- este recalculo por replay de inartrinv es del motor viejo y ya no
+    -- aplica para el (si lo tocara, lo desincronizaria de art_existencia
+    -- en la siguiente venta/recepcion, que si sigue escribiendo ahi).
+    IF EXISTS(SELECT id_presentacion FROM art_presentacion
+               WHERE num_emp = emp
+                 AND (cod_art_ancla = art OR cod_art_legacy = art)
+                 AND activo = "S")
+    THEN
+       CONTINUE FOREACH;
+    END IF;
+
     LET entdivkg = 0;
     LET entdivca = 0;
     LET saldivkg = 0;
