@@ -165,16 +165,27 @@ Justo después de `spRecibeRenglon.ExecProc` (que sigue igual, ver
 `DOCUMENTACION_cierre_diario.md` si hace falta repasar `formato.pas`):
 
 ```pascal
+if kilosNetos <> 0 then
+  costoPorKgBase := (FCosUniActual * cantRecibida) / kilosNetos
+else
+  costoPorKgBase := 0;
+
 spAplicaMovKardex.ParamByName('codart').AsString := FCodArtActual;
 spAplicaMovKardex.ParamByName('cantcap').AsFloat := cantRecibida;
-spAplicaMovKardex.ParamByName('costouni').AsFloat := FCosUniActual;
+spAplicaMovKardex.ParamByName('costouni').AsFloat := costoPorKgBase;
 spAplicaMovKardex.ParamByName('tipdoc').AsString := 'AC';
 spAplicaMovKardex.ParamByName('esentrada').AsString := 'S';
 spAplicaMovKardex.ExecProc;
 ```
 
-`costouni` es `FCosUniActual` (el costo acordado en la orden de compra)
-— es el que alimenta el promedio ponderado nuevo en `art_existencia`.
+`FCosUniActual` es el costo capturado en la orden de compra en la unidad
+de COMPRA (p.ej. costo por caja), pero `sp_aplica_mov_kardex` promedia
+el costo contra la cantidad ya convertida a unidad BASE (kg) — pasarle
+`FCosUniActual` tal cual dejaba el costo promedio multiplicado por el
+factor de la presentación (10x sobrestimado comprando por caja de
+10kg). Se convierte a costo por kg con el total realmente pagado
+(`FCosUniActual * cantRecibida`) entre los kilos netos reales
+recibidos (`kilosNetos`), antes de llamar a `spAplicaMovKardex`.
 
 ### 3.3 `UCierreDiario.pas`
 

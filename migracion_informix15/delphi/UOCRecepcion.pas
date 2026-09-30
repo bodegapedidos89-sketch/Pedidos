@@ -173,7 +173,7 @@ end;
 
 procedure TFormOCRecepcion.btnGuardarRecepcionClick(Sender: TObject);
 var
-  cantRecibida, cantXEmpaque, tara, kilosNetos: Double;
+  cantRecibida, cantXEmpaque, tara, kilosNetos, costoPorKgBase: Double;
 begin
   if FRenglonActual = 0 then
   begin
@@ -272,6 +272,20 @@ begin
 
     // motor de Kardex por producto unificado: solo aplica si
     // FCodArtActual ya esta dado de alta en art_presentacion
+    //
+    // FCosUniActual es el costo capturado en la orden (costo por CAJA,
+    // o por lo que sea la unidad de compra), pero sp_aplica_mov_kardex
+    // promedia el costo contra la cantidad ya convertida a unidad BASE
+    // (kg) -- si se le pasara FCosUniActual tal cual, el costo promedio
+    // quedaria multiplicado por el factor de la presentacion (p.ej. 10x
+    // si se compra por caja de 10kg). Se convierte aqui a costo por kg
+    // usando el total realmente pagado (FCosUniActual * cantRecibida)
+    // entre los kilos netos reales recibidos.
+    if kilosNetos <> 0 then
+      costoPorKgBase := (FCosUniActual * cantRecibida) / kilosNetos
+    else
+      costoPorKgBase := 0;
+
     spAplicaMovKardex.Close;
     spAplicaMovKardex.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
     spAplicaMovKardex.ParamByName('suc').AsString := Trim(edtEmpresa.Text);
@@ -281,7 +295,7 @@ begin
     spAplicaMovKardex.ParamByName('numdoc').AsString := IntToStr(FNumPedActual);
     spAplicaMovKardex.ParamByName('ren').AsInteger := FRenglonActual;
     spAplicaMovKardex.ParamByName('cantcap').AsFloat := cantRecibida;
-    spAplicaMovKardex.ParamByName('costouni').AsFloat := FCosUniActual;
+    spAplicaMovKardex.ParamByName('costouni').AsFloat := costoPorKgBase;
     spAplicaMovKardex.ParamByName('esentrada').AsString := 'S';
     spAplicaMovKardex.ExecProc;
   end;
