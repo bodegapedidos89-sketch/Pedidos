@@ -94,12 +94,17 @@ y luego:
    `cod_art_ancla` (no en cada código legacy de presentación, que se
    queda congelado — es justo lo que permite ir dejando de usarlos).
 
-`can_emp` espejado es *mejor esfuerzo*: queda con el `factor_a_base` de
-la presentación usada en **ese** movimiento. Si el producto tiene más de
-una presentación tipo "empaque" (caja de 10 y caja de 20, por ejemplo),
-ese campo va a ir cambiando según cuál se use más — quien de verdad hay
-que consultar para convertir cualquier presentación sigue siendo
-`art_presentacion`, nunca `inarinv.can_emp`.
+`can_emp`/`exi_cor_caj` espejados usan un factor **fijo**, no el de la
+presentación de **ese** movimiento: el de la presentación propia del
+ancla (`cod_art_legacy = cod_art_ancla`). Antes quedaban con el factor
+de lo último que se vendiera/recibiera (10 si se vendía por caja, 1 si
+después se vendía por kg suelto) — con el factor fijo ya no "saltan".
+Si el ancla no tiene una presentación propia dada de alta (código
+nuevo que no es ninguno de los legacy fusionados), no se inventa un
+factor: se deja el `can_emp` que ya traía `inarinv`. De todos modos
+quien de verdad hay que consultar para convertir cualquier presentación
+sigue siendo `art_presentacion`, nunca `inarinv.can_emp` — el espejo es
+solo por compatibilidad con quien todavía lo lea directo.
 
 ### 2.4 `sp_ajusta_existencia_base` — para diferencias ya calculadas en base
 
@@ -133,6 +138,17 @@ producto ya migrado, no el código legacy de una presentación puntual. Si
 la búsqueda inversa solo aceptara `cod_art_legacy`, un ancla que no esté
 registrada a sí misma como presentación de nada se habría quedado sin
 resolver — el ajuste se hubiera saltado en silencio.
+
+Ese `SELECT FIRST 1` sigue así — solo necesita **cualquier** fila que
+haga match para resolver `codancla`, cualquiera de las presentaciones
+del producto sirve igual para eso. Donde sí importaba cuál presentación
+regresara era en el factor usado para espejar `exi_cor_caj` en
+`inarinv`: cuando `codart` llega siendo ya el ancla, la condición OR
+matchea las 3 presentaciones del producto por igual y sin `ORDER BY`
+no hay garantía de cuál trae "FIRST 1" — el factor podía salir
+arbitrario. Se corrigió con la misma idea del factor fijo de 2.3: para
+el espejo se hace una segunda búsqueda específica por
+`cod_art_legacy = cod_art_ancla`, no se reusa el resultado de esta.
 
 ## 3. Dónde se conecta
 
@@ -249,8 +265,8 @@ recibidos (`kilosNetos`), antes de llamar a `spAplicaMovKardex`.
   para `art_existencia` (que reconstruya el saldo desde `art_kardex_mov`
   por si se sospecha que se desincronizó). Si hace falta, se puede
   agregar.
-- **`can_emp` espejado** es de la última presentación usada, no un
-  promedio — ver nota en 2.3. Si algún reporte fuera de lo que hemos
-  tocado depende de que `can_emp` sea exacto (no solo aproximado) para
-  artículos con varias presentaciones tipo empaque, avisar para revisar
-  ese reporte puntual.
+- ~~`can_emp` espejado es de la última presentación usada~~ — **resuelto**:
+  ahora usa el factor fijo de la presentación propia del ancla, ver nota
+  en 2.3. Sigue siendo un espejo de compatibilidad, no la fuente de
+  verdad — `art_presentacion` sigue siendo lo único que hay que
+  consultar para convertir cualquier presentación.

@@ -99,13 +99,17 @@ CREATE INDEX "informix".b_art_presentacion_legacy ON "informix".art_presentacion
 --     ancla (NO en cada codigo legacy de presentacion -- por diseno,
 --     ya que la existencia real vive centralizada en el ancla).
 --
--- can_emp espejado en inarinv es "mejor esfuerzo": queda con el
--- factor_a_base de la presentacion usada en ESTE movimiento, no un
--- promedio de todas las presentaciones del producto -- si el producto
--- tiene mas de una presentacion "de empaque" distinta, ese campo va a
--- ir cambiando segun cual se use mas recientemente. Quien de verdad
--- debe consultarse para convertir cualquier presentacion sigue siendo
--- art_presentacion, nunca inarinv.can_emp.
+-- can_emp/exi_cor_caj espejados en inarinv usan un factor FIJO, no el
+-- de la presentacion de ESTE movimiento: el de la presentacion propia
+-- del ancla (donde cod_art_legacy = cod_art_ancla). Asi no van
+-- cambiando segun cual presentacion se vendio/recibio mas
+-- recientemente (version anterior: 10 si se vendia por caja, 1 si
+-- despues se vendia por kg suelto). Si el ancla no tiene presentacion
+-- propia dada de alta, se deja el can_emp que ya traia inarinv en vez
+-- de inventar un factor. De todos modos, quien de verdad debe
+-- consultarse para convertir cualquier presentacion sigue siendo
+-- art_presentacion, nunca inarinv.can_emp -- este espejo es solo por
+-- compatibilidad con quien todavia lea inarinv directo.
 --------------------------------------------------------------------------
 CREATE PROCEDURE "informix".sp_aplica_mov_kardex(
   emp CHAR(2), suc CHAR(20), codart CHAR(14), fech DATE,
@@ -125,6 +129,8 @@ CREATE PROCEDURE "informix".sp_aplica_mov_kardex(
   DEFINE saldoval  DECIMAL(14,4);
   DEFINE exicaj    DECIMAL(14,4);
   DEFINE existe    CHAR(1);
+  DEFINE factorancla   DECIMAL(12,6);
+  DEFINE canempactual  DECIMAL(10,4);
 
   LET codancla = NULL;
 
@@ -184,8 +190,35 @@ CREATE PROCEDURE "informix".sp_aplica_mov_kardex(
   INSERT INTO art_kardex_mov VALUES(emp, codancla, suc, fech, tipdoc, numdoc,
          ren, idpres, cantcap, cantbase, costouni, costonew, existnew);
 
-  IF factor <> 0 THEN
-     LET exicaj = existnew / factor;
+  -- factor de referencia ESTABLE para espejar can_emp/exi_cor_caj en
+  -- inarinv: el de la presentacion PROPIA del ancla (donde
+  -- cod_art_legacy = cod_art_ancla), no el de la presentacion usada en
+  -- ESTE movimiento ("factor" de arriba). Si se usara ese ultimo,
+  -- can_emp iria cambiando cada vez segun cual presentacion se vendio
+  -- mas recientemente (10 si se vendio por caja, 1 si despues se vendio
+  -- por kg suelto, etc.) -- con esto queda fijo mientras no cambie el
+  -- catalogo de presentaciones.
+  LET factorancla = NULL;
+  SELECT FIRST 1 factor_a_base INTO factorancla
+    FROM art_presentacion
+   WHERE num_emp = emp AND cod_art_legacy = codancla AND activo = "S";
+
+  IF factorancla IS NULL OR factorancla = 0 THEN
+     -- el ancla no tiene presentacion propia dada de alta (es un
+     -- codigo nuevo que no es ninguno de los legacy fusionados): no se
+     -- inventa un factor, se deja el can_emp que ya traia inarinv
+     LET canempactual = NULL;
+     SELECT can_emp INTO canempactual FROM inarinv
+      WHERE inarinv.num_emp = emp AND inarinv.cod_art = codancla;
+     IF canempactual IS NULL OR canempactual = 0 THEN
+        LET factorancla = 1;
+     ELSE
+        LET factorancla = canempactual;
+     END IF;
+  END IF;
+
+  IF factorancla <> 0 THEN
+     LET exicaj = existnew / factorancla;
   ELSE
      LET exicaj = 0;
   END IF;
@@ -193,7 +226,7 @@ CREATE PROCEDURE "informix".sp_aplica_mov_kardex(
   UPDATE inarinv
      SET exi_cor_kgs = existnew,
          exi_cor_caj = exicaj,
-         can_emp = factor,
+         can_emp = factorancla,
          cos_pro_kgs = costonew,
          sal_val = saldoval
    WHERE inarinv.num_emp = emp AND inarinv.cod_art = codancla;
@@ -221,7 +254,6 @@ CREATE PROCEDURE "informix".sp_ajusta_existencia_base(
 
   DEFINE idpres    INTEGER;
   DEFINE codancla  CHAR(14);
-  DEFINE factor    DECIMAL(12,6);
   DEFINE existant  DECIMAL(14,4);
   DEFINE costoant  DECIMAL(12,4);
   DEFINE existnew  DECIMAL(14,4);
@@ -229,6 +261,8 @@ CREATE PROCEDURE "informix".sp_ajusta_existencia_base(
   DEFINE saldoval  DECIMAL(14,4);
   DEFINE exicaj    DECIMAL(14,4);
   DEFINE existe    CHAR(1);
+  DEFINE factorancla   DECIMAL(12,6);
+  DEFINE canempactual  DECIMAL(10,4);
 
   LET codancla = NULL;
 
@@ -236,11 +270,12 @@ CREATE PROCEDURE "informix".sp_ajusta_existencia_base(
   -- especifica -- por eso codart puede llegar aqui siendo directamente
   -- el cod_art_ancla (lo que se contó) o el cod_art_legacy de alguna
   -- presentacion puntual, segun como quede armado inv_diario. Se
-  -- aceptan los dos: solo se necesita el ancla y un factor de
-  -- referencia para espejar exi_cor_caj en inarinv; deltabase ya viene
-  -- en unidad base, no se vuelve a convertir.
-  SELECT FIRST 1 id_presentacion, cod_art_ancla, factor_a_base
-    INTO idpres, codancla, factor
+  -- aceptan los dos: solo se necesita resolver el ancla (idpres queda
+  -- de la presentacion que haya hecho match, nada más para trazar el
+  -- movimiento en art_kardex_mov); deltabase ya viene en unidad base,
+  -- no se vuelve a convertir.
+  SELECT FIRST 1 id_presentacion, cod_art_ancla
+    INTO idpres, codancla
     FROM art_presentacion
    WHERE num_emp = emp AND activo = "S"
      AND (cod_art_legacy = codart OR cod_art_ancla = codart);
@@ -290,8 +325,29 @@ CREATE PROCEDURE "informix".sp_ajusta_existencia_base(
   INSERT INTO art_kardex_mov VALUES(emp, codancla, suc, fech, tipdoc, numdoc,
          ren, idpres, deltabase, deltabase, costouni, costonew, existnew);
 
-  IF factor <> 0 THEN
-     LET exicaj = existnew / factor;
+  -- mismo factor de referencia ESTABLE que sp_aplica_mov_kardex: el de
+  -- la presentacion PROPIA del ancla, nunca el que haya hecho match en
+  -- el SELECT FIRST 1 de arriba (ese es arbitrario entre las
+  -- presentaciones del producto cuando codart llega siendo ya el
+  -- cod_art_ancla, porque matchea a todas por igual). No toca can_emp.
+  LET factorancla = NULL;
+  SELECT FIRST 1 factor_a_base INTO factorancla
+    FROM art_presentacion
+   WHERE num_emp = emp AND cod_art_legacy = codancla AND activo = "S";
+
+  IF factorancla IS NULL OR factorancla = 0 THEN
+     LET canempactual = NULL;
+     SELECT can_emp INTO canempactual FROM inarinv
+      WHERE inarinv.num_emp = emp AND inarinv.cod_art = codancla;
+     IF canempactual IS NULL OR canempactual = 0 THEN
+        LET factorancla = 1;
+     ELSE
+        LET factorancla = canempactual;
+     END IF;
+  END IF;
+
+  IF factorancla <> 0 THEN
+     LET exicaj = existnew / factorancla;
   ELSE
      LET exicaj = 0;
   END IF;
