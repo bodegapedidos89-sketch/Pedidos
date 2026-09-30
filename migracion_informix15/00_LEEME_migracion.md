@@ -52,6 +52,19 @@ que lo que hizo `dbexport`/`dbimport` automáticamente coincide.
 - Corre un cuadre de existencias/saldos contra el respaldo del día del
   corte, artículo por artículo, antes de dar por buena la migración.
 
+### Paso 3 (reset opcional, fase de pruebas) — Borrar todo lo nuevo
+Mientras se esté probando, para volver a crear el Paso 3 + 3b desde cero
+en vez de asumir en qué quedó a medias un intento anterior:
+```
+dbaccess nombrebase 00_drop_objetos_nuevos.sql
+```
+Borra todo lo que agregan `03_objetos_presentaciones.sql` y
+`delphi/04..07*.sql` (tablas, procedimientos, triggers, la columna que se
+le agregó a `ventas`) y **no toca ningún objeto legacy**. Si algún objeto
+de la lista todavía no existe, ese `DROP` puntual marca error y sigue con
+el resto — no hace falta correrlo en un orden específico según qué tanto
+se haya aplicado antes. Después de este reset, sigue con el Paso 3 normal.
+
 ### Paso 3 — Objetos nuevos (catálogo unificado de presentaciones)
 Solo después de que el esquema legacy ya esté completo y validado en el
 servidor nuevo, corre:
@@ -115,6 +128,7 @@ corte real.
 |---|---|
 | `01_crea_base_datos.sql` | `CREATE DATABASE` en el servidor nuevo, con notas de locale/log/ownership |
 | `02_esquema_legacy_original.sql` | Tu dump de esquema SE 10.0 completo, sin modificar — 208 tablas, ~130 índices, 54 procedimientos, 8 triggers |
+| `00_drop_objetos_nuevos.sql` | Reset de fase de pruebas: borra todo lo de 03..07 sin tocar nada legacy |
 | `03_objetos_presentaciones.sql` | Las tablas/procedimiento/trigger nuevos del catálogo unificado (versión final acordada) |
 | `delphi/04_bundles.sql` | Tablas de canastas/combos (`bundle_producto`, `bundle_detalle`) — sin procedimientos, todo lo resuelve Delphi |
 | `delphi/05_recepcion_compras.sql` | `oc_pedido_detalle`/`oc_recepcion_detalle` + `sp_recibe_renglon_oc` — separa capturar el pedido de recibirlo en almacén |
