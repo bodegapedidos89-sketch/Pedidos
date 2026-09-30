@@ -1,6 +1,6 @@
 # Migración Informix SE 10.0 → Informix Innovator-C 15.0.x (CentOS/RHEL)
 
-Este paquete tiene 3 archivos SQL y este LÉEME. **Ningún archivo aquí mueve
+Este paquete tiene 7 archivos SQL y este LÉEME. **Ningún archivo aquí mueve
 datos por sí solo** — el esquema (tablas/índices/procedimientos/triggers)
 y los datos se migran por separado, que es como IBM/HCL recomiendan hacerlo.
 
@@ -60,11 +60,54 @@ dbaccess nombrebase 03_objetos_presentaciones.sql
 ```
 (edita antes el `<NOMBREBASE>` del `DATABASE` al inicio del archivo).
 
+### Paso 3b — Bundles, recepción, cierre diario y motor de Kardex por presentación
+Todo lo de aquí en adelante es aditivo sobre lo que dejó el Paso 3 — no
+modifica ni un solo objeto legacy, así que no hay ventana de mantenimiento
+especial más allá de la normal para correr DDL. Los 4 archivos son
+independientes entre sí a nivel SQL (ninguno referencia procedimientos o
+tablas de otro), salvo que todos dan por hecho que `art_producto` /
+`art_presentacion` del Paso 3 ya existen. El orden numérico es solo por
+trazabilidad con la auditoría que se les corrió:
+```
+dbaccess nombrebase 04_bundles.sql
+dbaccess nombrebase 05_recepcion_compras.sql
+dbaccess nombrebase 06_cierre_diario.sql
+dbaccess nombrebase 07_kardex_por_presentacion.sql
+```
+(edita antes el `<NOMBREBASE>` del `DATABASE` al inicio de cada archivo;
+los 4 viven en `delphi/`, no en la raíz de `migracion_informix15/`).
+
+Verifica después de correrlos que los objetos nuevos quedaron dados de
+alta (ajusta el nombre de base):
+```sql
+SELECT tabname FROM systables
+ WHERE tabname IN ('bundle_producto','bundle_detalle','oc_pedido_detalle',
+   'oc_recepcion_detalle','hist_existencia_negativa','hist_recalculo_kardex',
+   'hist_log_cierre','art_existencia','art_kardex_mov');
+
+SELECT procname FROM sysprocedures
+ WHERE procname IN ('sp_recibe_renglon_oc','sp_cierre_recalcula_kardex',
+   'sp_cierre_detecta_negativos','sp_aplica_mov_kardex',
+   'sp_ajusta_existencia_base');
+```
+Cada consulta debe regresar todas las filas esperadas.
+
+Antes de generalizar, prueba el flujo completo (compra → recepción → venta
+→ cierre) con **un solo producto real de bajo riesgo** dado de alta en
+`art_presentacion` vía `UMantArticulos.pas` — la migración está diseñada
+para ser gradual justamente por esto: mientras un artículo no tenga fila en
+`art_presentacion`, sigue funcionando exactamente igual que hoy.
+
 ### Paso 4 — Delphi 7
 Repunta el `DatabaseName`/alias BDE (o el driver ODBC, según cómo termines
-conectando) de tus programas Delphi al servidor nuevo. Prueba primero
-`JUNTA.pas` y el programa de mantenimiento de artículos contra el servidor
-nuevo en un ambiente de pruebas antes del corte real.
+conectando) de tus programas Delphi al servidor nuevo, y agrega los
+`.dcu`/ejecutables recompilados de `formato.pas`, `UOCRecepcion.pas`,
+`UCierreDiario.pas`, `UReporteNegativos.pas`, `UMantArticulos.pas` y
+`UMantBundles.pas` (todos ya integrados en `UMenuPrincipal.pas`) — sus
+`TStoredProc` fallan al primer `ExecProc` si el Paso 3b no se corrió antes
+en ese servidor. Prueba primero `JUNTA.pas` y el programa de mantenimiento
+de artículos contra el servidor nuevo en un ambiente de pruebas antes del
+corte real.
 
 ## Archivos de este paquete
 
@@ -73,3 +116,7 @@ nuevo en un ambiente de pruebas antes del corte real.
 | `01_crea_base_datos.sql` | `CREATE DATABASE` en el servidor nuevo, con notas de locale/log/ownership |
 | `02_esquema_legacy_original.sql` | Tu dump de esquema SE 10.0 completo, sin modificar — 208 tablas, ~130 índices, 54 procedimientos, 8 triggers |
 | `03_objetos_presentaciones.sql` | Las tablas/procedimiento/trigger nuevos del catálogo unificado (versión final acordada) |
+| `delphi/04_bundles.sql` | Tablas de canastas/combos (`bundle_producto`, `bundle_detalle`) — sin procedimientos, todo lo resuelve Delphi |
+| `delphi/05_recepcion_compras.sql` | `oc_pedido_detalle`/`oc_recepcion_detalle` + `sp_recibe_renglon_oc` — separa capturar el pedido de recibirlo en almacén |
+| `delphi/06_cierre_diario.sql` | Detección de negativos, recálculo de Kardex y su historial, para `UCierreDiario.pas` |
+| `delphi/07_kardex_por_presentacion.sql` | `art_existencia`/`art_kardex_mov` + `sp_aplica_mov_kardex`/`sp_ajusta_existencia_base` — el motor de Kardex unificado por producto |
