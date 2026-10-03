@@ -1,13 +1,17 @@
 --------------------------------------------------------------------------
 -- 00_drop_objetos_nuevos.sql
 --
--- Reset limpio de TODO lo agregado en 03..07 (presentaciones, bundles,
--- recepcion, cierre diario y el motor de Kardex por presentacion), para
--- volver a crear todo desde cero durante la fase de pruebas. NO TOCA
--- ningun objeto legacy (inarinv, inartrinv, ventas como tabla, inarped,
--- act_kardex, etc.) -- solo quita lo que agregaron 03_objetos_presentaciones.sql,
+-- Reset limpio de TODO lo agregado en 03..09 (presentaciones, bundles,
+-- recepcion, cierre diario, el motor de Kardex por presentacion, codigo
+-- de barras y el catalogo de flotilla), para volver a crear todo desde
+-- cero durante la fase de pruebas. NO TOCA ningun objeto legacy
+-- (inarinv, inartrinv, ventas como tabla, inarped, act_kardex, etc.) --
+-- solo quita lo que agregaron 03_objetos_presentaciones.sql,
 -- delphi/04_bundles.sql, delphi/05_recepcion_compras.sql,
--- delphi/06_cierre_diario.sql y delphi/07_kardex_por_presentacion.sql.
+-- delphi/06_cierre_diario.sql, delphi/07_kardex_por_presentacion.sql,
+-- delphi/08_codigo_barras.sql y delphi/09_flotilla.sql. Las columnas de
+-- 08 (codigo_barras, codigo_bascula) se van solas al DROP TABLE
+-- art_presentacion, no necesitan un DROP aparte.
 --
 -- Orden: triggers -> procedimientos -> tablas -> la columna agregada a
 -- ventas. Los indices NO se dropean aparte -- en Informix, DROP TABLE se
@@ -21,15 +25,21 @@
 -- unicos errores son de objetos inexistentes, no otra cosa.
 --
 -- Despues de correr este archivo, vuelve a crear todo con, en este
--- orden (ver 00_LEEME_migracion.md, Paso 3 / Paso 3b):
+-- orden (ver 00_LEEME_migracion.md, Paso 3 / Paso 3b / Paso 3c):
 --   dbaccess nombrebase 03_objetos_presentaciones.sql
 --   dbaccess nombrebase delphi/04_bundles.sql
 --   dbaccess nombrebase delphi/05_recepcion_compras.sql
 --   dbaccess nombrebase delphi/06_cierre_diario.sql
 --   dbaccess nombrebase delphi/07_kardex_por_presentacion.sql
+--   dbaccess nombrebase delphi/08_codigo_barras.sql
+--   dbaccess nombrebase delphi/09_flotilla.sql   (independiente, en cualquier momento)
 --------------------------------------------------------------------------
 
 DATABASE <NOMBREBASE>;
+
+-- catalogo de flotilla de reparto (09) -- independiente de todo lo demas,
+-- se puede dropear/recrear en cualquier orden respecto al resto
+DROP TABLE "informix".flotilla_vehiculo;
 
 -- triggers sobre ventas (tabla legacy que NO se dropea, solo se le quita
 -- el trigger y la columna que agrego 03_objetos_presentaciones.sql)

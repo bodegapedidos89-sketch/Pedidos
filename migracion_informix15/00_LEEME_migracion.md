@@ -1,6 +1,6 @@
 # Migración Informix SE 10.0 → Informix Innovator-C 15.0.x (CentOS/RHEL)
 
-Este paquete tiene 8 archivos SQL y este LÉEME. **Ningún archivo aquí mueve
+Este paquete tiene 9 archivos SQL y este LÉEME. **Ningún archivo aquí mueve
 datos por sí solo** — el esquema (tablas/índices/procedimientos/triggers)
 y los datos se migran por separado, que es como IBM/HCL recomiendan hacerlo.
 
@@ -94,7 +94,17 @@ dbaccess nombrebase 07_kardex_por_presentacion.sql
 dbaccess nombrebase 08_codigo_barras.sql
 ```
 (edita antes el `<NOMBREBASE>` del `DATABASE` al inicio de cada archivo;
-los 4 viven en `delphi/`, no en la raíz de `migracion_informix15/`).
+los 5 viven en `delphi/`, no en la raíz de `migracion_informix15/`).
+
+### Paso 3c — Catálogo de flotilla de reparto (independiente)
+```
+dbaccess nombrebase delphi/09_flotilla.sql
+```
+A diferencia de 04..08, este archivo **no depende de nada del Paso 3**
+(ni de `art_producto`/`art_presentacion` ni de ningún objeto legacy) —
+se puede correr en cualquier momento después del Paso 1, incluso antes
+del Paso 3. Crea `flotilla_vehiculo` (camionetas/camiones) para
+`UMantFlotilla.pas`. Ver `delphi/DOCUMENTACION_flotilla.md`.
 
 Verifica después de correrlos que los objetos nuevos quedaron dados de
 alta (ajusta el nombre de base):
@@ -102,7 +112,7 @@ alta (ajusta el nombre de base):
 SELECT tabname FROM systables
  WHERE tabname IN ('bundle_producto','bundle_detalle','oc_pedido_detalle',
    'oc_recepcion_detalle','hist_existencia_negativa','hist_recalculo_kardex',
-   'hist_log_cierre','art_existencia','art_kardex_mov');
+   'hist_log_cierre','art_existencia','art_kardex_mov','flotilla_vehiculo');
 
 SELECT procname FROM sysprocedures
  WHERE procname IN ('sp_recibe_renglon_oc','sp_cierre_recalcula_kardex',
@@ -121,12 +131,13 @@ para ser gradual justamente por esto: mientras un artículo no tenga fila en
 Repunta el `DatabaseName`/alias BDE (o el driver ODBC, según cómo termines
 conectando) de tus programas Delphi al servidor nuevo, y agrega los
 `.dcu`/ejecutables recompilados de `formato.pas`, `UOCRecepcion.pas`,
-`UCierreDiario.pas`, `UReporteNegativos.pas`, `UMantArticulos.pas` y
-`UMantBundles.pas` (todos ya integrados en `UMenuPrincipal.pas`) — sus
-`TStoredProc` fallan al primer `ExecProc` si el Paso 3b no se corrió antes
-en ese servidor. `JUNTA.pas` y `UFormPresentacion.pas` también cambiaron
-(lectura de código de barras escaneado) y dependen de que
-`08_codigo_barras.sql` ya haya corrido. Prueba primero `JUNTA.pas`
+`UCierreDiario.pas`, `UReporteNegativos.pas`, `UMantArticulos.pas`,
+`UMantBundles.pas` y `UMantFlotilla.pas` (todos ya integrados en
+`UMenuPrincipal.pas`) — sus `TStoredProc`/`TQuery` fallan al primer
+`Open`/`ExecProc` si el Paso 3b (o, para `UMantFlotilla.pas`, el Paso 3c)
+no se corrió antes en ese servidor. `JUNTA.pas` y `UFormPresentacion.pas`
+también cambiaron (lectura de código de barras escaneado) y dependen de
+que `08_codigo_barras.sql` ya haya corrido. Prueba primero `JUNTA.pas`
 (venta normal y escaneando un código de barras) y el programa de
 mantenimiento de artículos contra el servidor nuevo en un ambiente de
 pruebas antes del corte real.
@@ -137,10 +148,11 @@ pruebas antes del corte real.
 |---|---|
 | `01_crea_base_datos.sql` | `CREATE DATABASE` en el servidor nuevo, con notas de locale/log/ownership |
 | `02_esquema_legacy_original.sql` | Tu dump de esquema SE 10.0 completo, sin modificar — 208 tablas, ~130 índices, 54 procedimientos, 8 triggers |
-| `00_drop_objetos_nuevos.sql` | Reset de fase de pruebas: borra todo lo de 03..08 sin tocar nada legacy |
+| `00_drop_objetos_nuevos.sql` | Reset de fase de pruebas: borra todo lo de 03..09 sin tocar nada legacy |
 | `03_objetos_presentaciones.sql` | Las tablas/procedimiento/trigger nuevos del catálogo unificado (versión final acordada) |
 | `delphi/04_bundles.sql` | Tablas de canastas/combos (`bundle_producto`, `bundle_detalle`) — sin procedimientos, todo lo resuelve Delphi |
 | `delphi/05_recepcion_compras.sql` | `oc_pedido_detalle`/`oc_recepcion_detalle` + `sp_recibe_renglon_oc` — separa capturar el pedido de recibirlo en almacén |
 | `delphi/06_cierre_diario.sql` | Detección de negativos, recálculo de Kardex y su historial, para `UCierreDiario.pas` |
 | `delphi/08_codigo_barras.sql` | `codigo_barras`/`codigo_bascula` en `art_presentacion` — identificación por código de barras fijo o de báscula para `JUNTA.pas` |
 | `delphi/07_kardex_por_presentacion.sql` | `art_existencia`/`art_kardex_mov` + `sp_aplica_mov_kardex`/`sp_ajusta_existencia_base` — el motor de Kardex unificado por producto |
+| `delphi/09_flotilla.sql` | `flotilla_vehiculo` — catálogo de camionetas/camiones de reparto, independiente del resto, para `UMantFlotilla.pas` |

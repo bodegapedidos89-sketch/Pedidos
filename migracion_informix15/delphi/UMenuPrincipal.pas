@@ -6,7 +6,7 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls,
   UMantArticulos, UMantBundles, formato, UOCRecepcion, UCierreDiario,
-  UReporteNegativos;
+  UReporteNegativos, UMantFlotilla;
 
 type
   TFormMenuPrincipal = class(TForm)
@@ -18,6 +18,7 @@ type
     btnRecepcion: TButton;
     btnCierre: TButton;
     btnTendencias: TButton;
+    btnFlotilla: TButton;
     btnSalir: TButton;
     procedure btnArticulosClick(Sender: TObject);
     procedure btnBundlesClick(Sender: TObject);
@@ -25,6 +26,7 @@ type
     procedure btnRecepcionClick(Sender: TObject);
     procedure btnCierreClick(Sender: TObject);
     procedure btnTendenciasClick(Sender: TObject);
+    procedure btnFlotillaClick(Sender: TObject);
     procedure btnSalirClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
   end;
@@ -98,6 +100,16 @@ begin
     FormReporteNegativos.ShowModal;
   finally
     FormReporteNegativos.Free;
+  end;
+end;
+
+procedure TFormMenuPrincipal.btnFlotillaClick(Sender: TObject);
+begin
+  FormMantFlotilla := TFormMantFlotilla.Create(Application);
+  try
+    FormMantFlotilla.ShowModal;
+  finally
+    FormMantFlotilla.Free;
   end;
 end;
 
