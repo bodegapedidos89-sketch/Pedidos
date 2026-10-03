@@ -1,16 +1,18 @@
 --------------------------------------------------------------------------
 -- 00_drop_objetos_nuevos.sql
 --
--- Reset limpio de TODO lo agregado en 03..09 (presentaciones, bundles,
+-- Reset limpio de TODO lo agregado en 03..12 (presentaciones, bundles,
 -- recepcion, cierre diario, el motor de Kardex por presentacion, codigo
--- de barras y el catalogo de flotilla), para volver a crear todo desde
--- cero durante la fase de pruebas. NO TOCA ningun objeto legacy
--- (inarinv, inartrinv, ventas como tabla, inarped, act_kardex, etc.) --
--- solo quita lo que agregaron 03_objetos_presentaciones.sql,
--- delphi/04_bundles.sql, delphi/05_recepcion_compras.sql,
--- delphi/06_cierre_diario.sql, delphi/07_kardex_por_presentacion.sql,
--- delphi/08_codigo_barras.sql y delphi/09_flotilla.sql. Las columnas de
--- 08 (codigo_barras, codigo_bascula) se van solas al DROP TABLE
+-- de barras, flotilla, choferes, bitacora y reparto), para volver a
+-- crear todo desde cero durante la fase de pruebas. NO TOCA ningun
+-- objeto legacy (inarinv, inartrinv, ventas como tabla, inarped,
+-- act_kardex, etc.) -- solo quita lo que agregaron
+-- 03_objetos_presentaciones.sql, delphi/04_bundles.sql,
+-- delphi/05_recepcion_compras.sql, delphi/06_cierre_diario.sql,
+-- delphi/07_kardex_por_presentacion.sql, delphi/08_codigo_barras.sql,
+-- delphi/09_flotilla.sql, delphi/10_flotilla_choferes.sql,
+-- delphi/11_flotilla_bitacora.sql y delphi/12_reparto.sql. Las columnas
+-- de 08 (codigo_barras, codigo_bascula) se van solas al DROP TABLE
 -- art_presentacion, no necesitan un DROP aparte.
 --
 -- Orden: triggers -> procedimientos -> tablas -> la columna agregada a
@@ -33,12 +35,27 @@
 --   dbaccess nombrebase delphi/07_kardex_por_presentacion.sql
 --   dbaccess nombrebase delphi/08_codigo_barras.sql
 --   dbaccess nombrebase delphi/09_flotilla.sql   (independiente, en cualquier momento)
+--   dbaccess nombrebase delphi/10_flotilla_choferes.sql
+--   dbaccess nombrebase delphi/11_flotilla_bitacora.sql   (necesita 09)
+--   dbaccess nombrebase delphi/12_reparto.sql              (necesita 09 y 10)
 --------------------------------------------------------------------------
 
 DATABASE <NOMBREBASE>;
 
--- catalogo de flotilla de reparto (09) -- independiente de todo lo demas,
--- se puede dropear/recrear en cualquier orden respecto al resto
+-- reparto (12) -- referencia flotilla_vehiculo/flotilla_chofer por
+-- comentario/diseno, sin FK real, pero se dropea primero por claridad
+DROP TABLE "informix".reparto_pedido_estatus_hist;
+DROP TABLE "informix".reparto_pedido;
+DROP TABLE "informix".reparto_ruta;
+
+-- bitacora de combustible/mantenimiento (11) -- referencia
+-- flotilla_vehiculo.id_vehiculo
+DROP TABLE "informix".flotilla_bitacora;
+
+-- catalogo de choferes (10) -- independiente de flotilla_vehiculo
+DROP TABLE "informix".flotilla_chofer;
+
+-- catalogo de flotilla de reparto (09) -- independiente de todo lo demas
 DROP TABLE "informix".flotilla_vehiculo;
 
 -- triggers sobre ventas (tabla legacy que NO se dropea, solo se le quita

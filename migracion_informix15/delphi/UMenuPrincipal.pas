@@ -6,7 +6,8 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls,
   UMantArticulos, UMantBundles, formato, UOCRecepcion, UCierreDiario,
-  UReporteNegativos, UMantFlotilla;
+  UReporteNegativos, UMantFlotilla, UMantChoferes, UMantBitacoraFlotilla,
+  UReparto, URepartoMonitor;
 
 type
   TFormMenuPrincipal = class(TForm)
@@ -19,6 +20,10 @@ type
     btnCierre: TButton;
     btnTendencias: TButton;
     btnFlotilla: TButton;
+    btnChoferes: TButton;
+    btnBitacoraFlotilla: TButton;
+    btnReparto: TButton;
+    btnRepartoMonitor: TButton;
     btnSalir: TButton;
     procedure btnArticulosClick(Sender: TObject);
     procedure btnBundlesClick(Sender: TObject);
@@ -27,6 +32,10 @@ type
     procedure btnCierreClick(Sender: TObject);
     procedure btnTendenciasClick(Sender: TObject);
     procedure btnFlotillaClick(Sender: TObject);
+    procedure btnChoferesClick(Sender: TObject);
+    procedure btnBitacoraFlotillaClick(Sender: TObject);
+    procedure btnRepartoClick(Sender: TObject);
+    procedure btnRepartoMonitorClick(Sender: TObject);
     procedure btnSalirClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
   end;
@@ -110,6 +119,46 @@ begin
     FormMantFlotilla.ShowModal;
   finally
     FormMantFlotilla.Free;
+  end;
+end;
+
+procedure TFormMenuPrincipal.btnChoferesClick(Sender: TObject);
+begin
+  FormMantChoferes := TFormMantChoferes.Create(Application);
+  try
+    FormMantChoferes.ShowModal;
+  finally
+    FormMantChoferes.Free;
+  end;
+end;
+
+procedure TFormMenuPrincipal.btnBitacoraFlotillaClick(Sender: TObject);
+begin
+  FormMantBitacoraFlotilla := TFormMantBitacoraFlotilla.Create(Application);
+  try
+    FormMantBitacoraFlotilla.ShowModal;
+  finally
+    FormMantBitacoraFlotilla.Free;
+  end;
+end;
+
+procedure TFormMenuPrincipal.btnRepartoClick(Sender: TObject);
+begin
+  FormReparto := TFormReparto.Create(Application);
+  try
+    FormReparto.ShowModal;
+  finally
+    FormReparto.Free;
+  end;
+end;
+
+procedure TFormMenuPrincipal.btnRepartoMonitorClick(Sender: TObject);
+begin
+  FormRepartoMonitor := TFormRepartoMonitor.Create(Application);
+  try
+    FormRepartoMonitor.ShowModal;
+  finally
+    FormRepartoMonitor.Free;
   end;
 end;
 

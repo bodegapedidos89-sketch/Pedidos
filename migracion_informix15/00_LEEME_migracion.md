@@ -1,6 +1,6 @@
 # Migración Informix SE 10.0 → Informix Innovator-C 15.0.x (CentOS/RHEL)
 
-Este paquete tiene 9 archivos SQL y este LÉEME. **Ningún archivo aquí mueve
+Este paquete tiene 12 archivos SQL y este LÉEME. **Ningún archivo aquí mueve
 datos por sí solo** — el esquema (tablas/índices/procedimientos/triggers)
 y los datos se migran por separado, que es como IBM/HCL recomiendan hacerlo.
 
@@ -96,15 +96,26 @@ dbaccess nombrebase 08_codigo_barras.sql
 (edita antes el `<NOMBREBASE>` del `DATABASE` al inicio de cada archivo;
 los 5 viven en `delphi/`, no en la raíz de `migracion_informix15/`).
 
-### Paso 3c — Catálogo de flotilla de reparto (independiente)
+### Paso 3c — Flotilla, choferes, bitácora y reparto (independiente)
 ```
 dbaccess nombrebase delphi/09_flotilla.sql
+dbaccess nombrebase delphi/10_flotilla_choferes.sql
+dbaccess nombrebase delphi/11_flotilla_bitacora.sql
+dbaccess nombrebase delphi/12_reparto.sql
 ```
-A diferencia de 04..08, este archivo **no depende de nada del Paso 3**
-(ni de `art_producto`/`art_presentacion` ni de ningún objeto legacy) —
-se puede correr en cualquier momento después del Paso 1, incluso antes
-del Paso 3. Crea `flotilla_vehiculo` (camionetas/camiones) para
-`UMantFlotilla.pas`. Ver `delphi/DOCUMENTACION_flotilla.md`.
+A diferencia de 04..08, estos cuatro archivos **no dependen de nada
+del Paso 3** (ni de `art_producto`/`art_presentacion` ni de ningún
+objeto legacy) — se pueden correr en cualquier momento después del
+Paso 1, incluso antes del Paso 3. Sí dependen entre ellos, en este
+orden: `09` crea `flotilla_vehiculo`; `10` crea `flotilla_chofer`
+(independiente de `09`, pero se lista junto por tema); `11`
+(bitácora) referencia `flotilla_vehiculo.id_vehiculo`, necesita `09`
+primero; `12` (reparto) referencia `flotilla_vehiculo.id_vehiculo` y
+`flotilla_chofer.id_chofer`, necesita `09` y `10` primero. Para
+`UMantFlotilla.pas`, `UMantChoferes.pas`, `UMantBitacoraFlotilla.pas`,
+`UReparto.pas` y `URepartoMonitor.pas`. Ver
+`delphi/DOCUMENTACION_flotilla.md`, `delphi/DOCUMENTACION_choferes_bitacora.md`
+y `delphi/DOCUMENTACION_reparto.md`.
 
 Verifica después de correrlos que los objetos nuevos quedaron dados de
 alta (ajusta el nombre de base):
@@ -112,7 +123,9 @@ alta (ajusta el nombre de base):
 SELECT tabname FROM systables
  WHERE tabname IN ('bundle_producto','bundle_detalle','oc_pedido_detalle',
    'oc_recepcion_detalle','hist_existencia_negativa','hist_recalculo_kardex',
-   'hist_log_cierre','art_existencia','art_kardex_mov','flotilla_vehiculo');
+   'hist_log_cierre','art_existencia','art_kardex_mov','flotilla_vehiculo',
+   'flotilla_chofer','flotilla_bitacora','reparto_ruta','reparto_pedido',
+   'reparto_pedido_estatus_hist');
 
 SELECT procname FROM sysprocedures
  WHERE procname IN ('sp_recibe_renglon_oc','sp_cierre_recalcula_kardex',
@@ -132,15 +145,19 @@ Repunta el `DatabaseName`/alias BDE (o el driver ODBC, según cómo termines
 conectando) de tus programas Delphi al servidor nuevo, y agrega los
 `.dcu`/ejecutables recompilados de `formato.pas`, `UOCRecepcion.pas`,
 `UCierreDiario.pas`, `UReporteNegativos.pas`, `UMantArticulos.pas`,
-`UMantBundles.pas` y `UMantFlotilla.pas` (todos ya integrados en
-`UMenuPrincipal.pas`) — sus `TStoredProc`/`TQuery` fallan al primer
-`Open`/`ExecProc` si el Paso 3b (o, para `UMantFlotilla.pas`, el Paso 3c)
-no se corrió antes en ese servidor. `JUNTA.pas` y `UFormPresentacion.pas`
-también cambiaron (lectura de código de barras escaneado) y dependen de
-que `08_codigo_barras.sql` ya haya corrido. Prueba primero `JUNTA.pas`
+`UMantBundles.pas`, `UMantFlotilla.pas`, `UMantChoferes.pas`,
+`UMantBitacoraFlotilla.pas`, `UReparto.pas` y `URepartoMonitor.pas`
+(todos ya integrados en `UMenuPrincipal.pas`) — sus `TStoredProc`/
+`TQuery` fallan al primer `Open`/`ExecProc` si el Paso 3b (o, para los
+programas de flotilla/choferes/reparto, el Paso 3c) no se corrió antes
+en ese servidor. `JUNTA.pas` y `UFormPresentacion.pas` también
+cambiaron (lectura de código de barras escaneado) y dependen de que
+`08_codigo_barras.sql` ya haya corrido. Prueba primero `JUNTA.pas`
 (venta normal y escaneando un código de barras) y el programa de
 mantenimiento de artículos contra el servidor nuevo en un ambiente de
-pruebas antes del corte real.
+pruebas antes del corte real; para reparto, prueba el flujo completo
+armar ruta → asignar pedido → cambiar estatus → imprimir remisión
+contra una impresora de prueba antes de usarla con choferes reales.
 
 ## Archivos de este paquete
 
@@ -148,7 +165,7 @@ pruebas antes del corte real.
 |---|---|
 | `01_crea_base_datos.sql` | `CREATE DATABASE` en el servidor nuevo, con notas de locale/log/ownership |
 | `02_esquema_legacy_original.sql` | Tu dump de esquema SE 10.0 completo, sin modificar — 208 tablas, ~130 índices, 54 procedimientos, 8 triggers |
-| `00_drop_objetos_nuevos.sql` | Reset de fase de pruebas: borra todo lo de 03..09 sin tocar nada legacy |
+| `00_drop_objetos_nuevos.sql` | Reset de fase de pruebas: borra todo lo de 03..12 sin tocar nada legacy |
 | `03_objetos_presentaciones.sql` | Las tablas/procedimiento/trigger nuevos del catálogo unificado (versión final acordada) |
 | `delphi/04_bundles.sql` | Tablas de canastas/combos (`bundle_producto`, `bundle_detalle`) — sin procedimientos, todo lo resuelve Delphi |
 | `delphi/05_recepcion_compras.sql` | `oc_pedido_detalle`/`oc_recepcion_detalle` + `sp_recibe_renglon_oc` — separa capturar el pedido de recibirlo en almacén |
@@ -156,3 +173,6 @@ pruebas antes del corte real.
 | `delphi/08_codigo_barras.sql` | `codigo_barras`/`codigo_bascula` en `art_presentacion` — identificación por código de barras fijo o de báscula para `JUNTA.pas` |
 | `delphi/07_kardex_por_presentacion.sql` | `art_existencia`/`art_kardex_mov` + `sp_aplica_mov_kardex`/`sp_ajusta_existencia_base` — el motor de Kardex unificado por producto |
 | `delphi/09_flotilla.sql` | `flotilla_vehiculo` — catálogo de camionetas/camiones de reparto, independiente del resto, para `UMantFlotilla.pas` |
+| `delphi/10_flotilla_choferes.sql` | `flotilla_chofer` — catálogo de choferes, para `UMantChoferes.pas` |
+| `delphi/11_flotilla_bitacora.sql` | `flotilla_bitacora` — combustible y mantenimiento por vehículo, para `UMantBitacoraFlotilla.pas` |
+| `delphi/12_reparto.sql` | `reparto_ruta`/`reparto_pedido`/`reparto_pedido_estatus_hist` — pedidos a ruta de reparto, estatus e historial, para `UReparto.pas` y `URepartoMonitor.pas` |
