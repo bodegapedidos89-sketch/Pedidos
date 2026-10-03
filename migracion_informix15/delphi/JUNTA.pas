@@ -4511,6 +4511,10 @@ procedure TForm9.CODIGOARTKeyPress(Sender: TObject; var Key: Char);
 var
     SITIENECOTI, sirestau : integer;
     PRE1F : REAL;
+    EsBarras, EsNumerico: Boolean;
+    i: Integer;
+    CodAnclaBarrasTmp: string;
+    PesoBasculaTmp: Double;
 begin
      IF KEY = (#13) THEN
       BEGIN
@@ -4519,40 +4523,82 @@ begin
       SITIENECOTI := 0;
       PRE1F:= 0;
 
-      // === NUEVO: detectar si el codigo tecleado es un BUNDLE ===
-      qBuscaBundle.Close;
-      qBuscaBundle.SQL.Text :=
-        'SELECT id_bundle FROM bundle_producto ' +
-        'WHERE num_emp = :emp AND cod_bundle = :cod AND activo = ''S''';
-      qBuscaBundle.ParamByName('emp').AsString := NUM_EMPRESA.Text;
-      qBuscaBundle.ParamByName('cod').AsString := Trim(CODIGOART.Text);
-      qBuscaBundle.Open;
-      FEsBundle := not qBuscaBundle.Eof;
-      if FEsBundle then
-        FIdBundleSel := qBuscaBundle.FieldByName('id_bundle').AsInteger;
-      qBuscaBundle.Close;
-
-      if FEsBundle then
+      // === NUEVO: detectar si lo tecleado/escaneado es un CODIGO DE
+      // BARRAS (13 digitos numericos) en vez de un codigo de articulo
+      // tecleado a mano. Un codigo de barras ya identifica UNA sola
+      // presentacion -- no hace falta preguntar cual (a diferencia de
+      // teclear el codigo ancla) ni revisar si es un bundle.
+      EsBarras := Length(Trim(CODIGOART.Text)) = 13;
+      if EsBarras then
       begin
-        // no se resuelve presentacion individual ni se buscan cotizaciones
-        // aqui -- se pide directo la cantidad de bundles en CAJ_PRO
-        FIdPresentacionSel := 0;
-        Key := #0;
-        CAJ_PRO.Text := '';
-        CAJ_PRO.SetFocus;
-        Exit;
+        EsNumerico := True;
+        for i := 1 to 13 do
+          if not (Trim(CODIGOART.Text)[i] in ['0'..'9']) then
+          begin
+            EsNumerico := False;
+            Break;
+          end;
+        EsBarras := EsNumerico;
       end;
-      // ============================================================
 
-      // === NUEVO: resolver presentacion ANTES de cualquier busqueda de precio ===
-      if not TFormPresentacion.Seleccionar(Database1, CODIGOART.Text, 'V',
-             FIdPresentacionSel, FCodArtResuelto, FFactorPresentacion,
-             FPrecioDerivadoSel, FTaraSel, FEsVariableSel) then
+      if EsBarras then
       begin
-        Key := #0;
-        Exit; // cancelo, no se toca el articulo
+        FEsBundle := False;
+        if not TFormPresentacion.ResuelvePorCodigoBarras(Database1,
+               NUM_EMPRESA.Text, Trim(CODIGOART.Text), FIdPresentacionSel,
+               CodAnclaBarrasTmp, FCodArtResuelto, FFactorPresentacion,
+               FPrecioDerivadoSel, FTaraSel, FEsVariableSel, PesoBasculaTmp)
+        then
+        begin
+          ShowMessage('Codigo de barras no reconocido');
+          Key := #0;
+          CODIGOART.Text := '';
+          CODIGOART.SetFocus;
+          Exit;
+        end;
+        CODIGOART.KEYVALUE := FCodArtResuelto;
+        if FEsVariableSel and (PesoBasculaTmp > 0) then
+          // el peso ya viene codificado en el propio codigo de barras
+          // (bascula) -- no hace falta que el cajero lo teclee
+          CAJ_PRO.Text := FloatToStr(PesoBasculaTmp);
+      end
+      else
+      begin
+        // === NUEVO: detectar si el codigo tecleado es un BUNDLE ===
+        qBuscaBundle.Close;
+        qBuscaBundle.SQL.Text :=
+          'SELECT id_bundle FROM bundle_producto ' +
+          'WHERE num_emp = :emp AND cod_bundle = :cod AND activo = ''S''';
+        qBuscaBundle.ParamByName('emp').AsString := NUM_EMPRESA.Text;
+        qBuscaBundle.ParamByName('cod').AsString := Trim(CODIGOART.Text);
+        qBuscaBundle.Open;
+        FEsBundle := not qBuscaBundle.Eof;
+        if FEsBundle then
+          FIdBundleSel := qBuscaBundle.FieldByName('id_bundle').AsInteger;
+        qBuscaBundle.Close;
+
+        if FEsBundle then
+        begin
+          // no se resuelve presentacion individual ni se buscan cotizaciones
+          // aqui -- se pide directo la cantidad de bundles en CAJ_PRO
+          FIdPresentacionSel := 0;
+          Key := #0;
+          CAJ_PRO.Text := '';
+          CAJ_PRO.SetFocus;
+          Exit;
+        end;
+        // ============================================================
+
+        // === NUEVO: resolver presentacion ANTES de cualquier busqueda de precio ===
+        if not TFormPresentacion.Seleccionar(Database1, CODIGOART.Text, 'V',
+               FIdPresentacionSel, FCodArtResuelto, FFactorPresentacion,
+               FPrecioDerivadoSel, FTaraSel, FEsVariableSel) then
+        begin
+          Key := #0;
+          Exit; // cancelo, no se toca el articulo
+        end;
+        CODIGOART.KEYVALUE := FCodArtResuelto;
       end;
-      CODIGOART.KEYVALUE := FCodArtResuelto;
       // ==========================================================================
 
       qbusat.close;

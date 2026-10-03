@@ -42,6 +42,10 @@ type
     chkEsVariable: TCheckBox;
     chkPrecioDerivado: TCheckBox;
     rgUso: TRadioGroup;
+    lblCodigoBarras: TLabel;
+    lblCodigoBascula: TLabel;
+    edtCodigoBarras: TEdit;
+    edtCodigoBascula: TEdit;
     chkPresentacionActiva: TCheckBox;
     btnNuevaPresentacion: TButton;
     btnGuardarPresentacion: TButton;
@@ -121,6 +125,8 @@ begin
   chkEsVariable.Checked := False;
   chkPrecioDerivado.Checked := False;
   rgUso.ItemIndex := 2; // 'A' ambos, por default
+  edtCodigoBarras.Text := '';
+  edtCodigoBascula.Text := '';
   chkPresentacionActiva.Checked := True;
 end;
 
@@ -235,6 +241,8 @@ begin
   edtTara.Text := qPresentaciones.FieldByName('tara_kg').AsString;
   chkEsVariable.Checked := Trim(qPresentaciones.FieldByName('es_variable').AsString) = 'S';
   chkPrecioDerivado.Checked := Trim(qPresentaciones.FieldByName('precio_derivado').AsString) = 'S';
+  edtCodigoBarras.Text := Trim(qPresentaciones.FieldByName('codigo_barras').AsString);
+  edtCodigoBascula.Text := Trim(qPresentaciones.FieldByName('codigo_bascula').AsString);
   chkPresentacionActiva.Checked := Trim(qPresentaciones.FieldByName('activo').AsString) = 'S';
   if Trim(qPresentaciones.FieldByName('uso').AsString) = 'C' then
     rgUso.ItemIndex := 0
@@ -260,6 +268,9 @@ var
   Existe: Boolean;
   Factor, Tara: Double;
   Uso: string;
+  CodBarras, CodBascula: string;
+  i: Integer;
+  SoloDigitos: Boolean;
 begin
   if FCodAnclaActual = '' then
   begin
@@ -293,6 +304,56 @@ begin
     Exit;
   end;
 
+  // codigo de barras FIJO: si se captura, debe quedar exactamente igual
+  // de largo (13 digitos) a lo que JUNTA.pas reconoce como codigo de
+  // barras escaneado -- si no, nunca va a hacer match en el mostrador
+  // y la captura queda muerta sin que nadie se de cuenta.
+  CodBarras := Trim(edtCodigoBarras.Text);
+  if CodBarras <> '' then
+  begin
+    SoloDigitos := Length(CodBarras) = 13;
+    if SoloDigitos then
+      for i := 1 to 13 do
+        if not (CodBarras[i] in ['0'..'9']) then
+        begin
+          SoloDigitos := False;
+          Break;
+        end;
+    if not SoloDigitos then
+    begin
+      ShowMessage('El codigo de barras fijo debe ser de 13 digitos numericos (EAN-13)');
+      edtCodigoBarras.SetFocus;
+      Exit;
+    end;
+  end;
+
+  // codigo interno de bascula: el segmento de 5 digitos que va a traer
+  // escondido cada etiqueta de peso variable (ver 08_codigo_barras.sql)
+  CodBascula := Trim(edtCodigoBascula.Text);
+  if CodBascula <> '' then
+  begin
+    SoloDigitos := Length(CodBascula) = 5;
+    if SoloDigitos then
+      for i := 1 to 5 do
+        if not (CodBascula[i] in ['0'..'9']) then
+        begin
+          SoloDigitos := False;
+          Break;
+        end;
+    if not SoloDigitos then
+    begin
+      ShowMessage('El codigo interno de bascula debe ser de 5 digitos numericos');
+      edtCodigoBascula.SetFocus;
+      Exit;
+    end;
+    if not chkEsVariable.Checked then
+    begin
+      ShowMessage('El codigo de bascula solo aplica si "Es variable" esta marcado');
+      chkEsVariable.SetFocus;
+      Exit;
+    end;
+  end;
+
   case rgUso.ItemIndex of
     0: Uso := 'C';
     1: Uso := 'V';
@@ -322,7 +383,7 @@ begin
     qOper.SQL.Text :=
       'UPDATE art_presentacion SET cod_art_legacy = :leg, factor_a_base = :fac, ' +
       'tara_kg = :tara, es_variable = :var, precio_derivado = :pder, uso = :uso, ' +
-      'activo = :act ' +
+      'codigo_barras = :barras, codigo_bascula = :bascula, activo = :act ' +
       'WHERE num_emp = :emp AND cod_art_ancla = :anc AND etiqueta = :etq';
   end
   else
@@ -330,8 +391,8 @@ begin
     qOper.SQL.Text :=
       'INSERT INTO art_presentacion ' +
       '(num_emp, cod_art_ancla, cod_art_legacy, etiqueta, factor_a_base, tara_kg, ' +
-      ' es_variable, precio_derivado, uso, activo) ' +
-      'VALUES (:emp, :anc, :leg, :etq, :fac, :tara, :var, :pder, :uso, :act)';
+      ' es_variable, precio_derivado, uso, codigo_barras, codigo_bascula, activo) ' +
+      'VALUES (:emp, :anc, :leg, :etq, :fac, :tara, :var, :pder, :uso, :barras, :bascula, :act)';
   end;
   qOper.ParamByName('emp').AsString := Trim(edtEmpresa.Text);
   qOper.ParamByName('anc').AsString := FCodAnclaActual;
@@ -342,6 +403,12 @@ begin
   if chkEsVariable.Checked then qOper.ParamByName('var').AsString := 'S' else qOper.ParamByName('var').AsString := 'N';
   if chkPrecioDerivado.Checked then qOper.ParamByName('pder').AsString := 'S' else qOper.ParamByName('pder').AsString := 'N';
   qOper.ParamByName('uso').AsString := Uso;
+  // NULL (no '') cuando no se captura, para que el indice de busqueda
+  // por codigo de barras no confunda "sin codigo" con un codigo vacio
+  if CodBarras = '' then qOper.ParamByName('barras').Clear
+  else qOper.ParamByName('barras').AsString := CodBarras;
+  if CodBascula = '' then qOper.ParamByName('bascula').Clear
+  else qOper.ParamByName('bascula').AsString := CodBascula;
   if chkPresentacionActiva.Checked then qOper.ParamByName('act').AsString := 'S' else qOper.ParamByName('act').AsString := 'N';
   qOper.ExecSQL;
 

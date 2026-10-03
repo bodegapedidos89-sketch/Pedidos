@@ -27,6 +27,11 @@ type
       Uso: Char; out IdPresentacion: Integer; out CodArtLegacy: string;
       out Factor: Double; out PrecioDerivado: Boolean; out Tara: Double;
       out EsVariable: Boolean): Boolean;
+    class function ResuelvePorCodigoBarras(Database: TDatabase;
+      const NumEmp, CodigoEscaneado: string; out IdPresentacion: Integer;
+      out CodArtAncla, CodArtLegacy: string; out Factor: Double;
+      out PrecioDerivado: Boolean; out Tara: Double; out EsVariable: Boolean;
+      out PesoKgBascula: Double): Boolean;
   end;
 
 implementation
@@ -130,6 +135,126 @@ begin
     finally
       Frm.Free;
     end;
+  finally
+    Qry.Free;
+  end;
+end;
+
+{----------------------------------------------------------------------
+  Resuelve un codigo ESCANEADO (13 digitos) a una presentacion, sin
+  preguntarle nada al cajero -- un codigo de barras ya identifica una
+  sola presentacion, a diferencia de teclear el codigo ancla (que
+  puede tener varias y ahi si hace falta el selector de Seleccionar).
+
+  Dos formatos conviven en las mismas columnas de art_presentacion:
+    * Prefijo 20-29: codigo de BASCULA (es_variable='S'). El peso
+      viene codificado en los digitos 8-12 (gramos) -- se decodifica
+      aqui mismo y se regresa en PesoKgBascula; el llamador lo usa
+      para prellenar la cantidad sin que el cajero la teclee.
+    * Cualquier otro prefijo: codigo FIJO impreso en el empaque
+      (es_variable='N'), busqueda por igualdad exacta completa.
+
+  Si CodigoEscaneado no tiene 13 digitos numericos, o no hace match
+  con ninguna presentacion, regresa False y el llamador debe tratarlo
+  como lo que sea que haya tecleado (codigo ancla, bundle, etc.) --
+  esta funcion nunca asume que algo es un codigo de barras invalido,
+  solo dice si SI lo reconocio como uno valido.
+----------------------------------------------------------------------}
+class function TFormPresentacion.ResuelvePorCodigoBarras(Database: TDatabase;
+  const NumEmp, CodigoEscaneado: string; out IdPresentacion: Integer;
+  out CodArtAncla, CodArtLegacy: string; out Factor: Double;
+  out PrecioDerivado: Boolean; out Tara: Double; out EsVariable: Boolean;
+  out PesoKgBascula: Double): Boolean;
+var
+  Qry: TQuery;
+  Codigo, Prefijo, CodInterno, PesoTexto: string;
+  i: Integer;
+  EsNumerico: Boolean;
+begin
+  IdPresentacion := 0;
+  CodArtAncla := '';
+  CodArtLegacy := '';
+  Factor := 1;
+  PrecioDerivado := False;
+  Tara := 0;
+  EsVariable := False;
+  PesoKgBascula := 0;
+  Result := False;
+
+  Codigo := Trim(CodigoEscaneado);
+  if Length(Codigo) <> 13 then Exit;
+
+  EsNumerico := True;
+  for i := 1 to 13 do
+    if not (Codigo[i] in ['0'..'9']) then
+    begin
+      EsNumerico := False;
+      Break;
+    end;
+  if not EsNumerico then Exit;
+
+  Prefijo := Copy(Codigo, 1, 2);
+
+  Qry := TQuery.Create(nil);
+  try
+    Qry.DatabaseName := Database.DatabaseName;
+
+    if (Prefijo >= '20') and (Prefijo <= '29') then
+    begin
+      // codigo de bascula: digitos 3-7 = codigo interno, 8-12 = peso
+      // en gramos, 13 = digito verificador (no se valida aqui)
+      CodInterno := Copy(Codigo, 3, 5);
+      PesoTexto  := Copy(Codigo, 8, 5);
+
+      Qry.SQL.Text :=
+        'SELECT id_presentacion, cod_art_ancla, cod_art_legacy, factor_a_base, ' +
+        'precio_derivado, tara_kg, es_variable FROM art_presentacion ' +
+        'WHERE num_emp = :emp AND codigo_bascula = :cod AND es_variable = ''S'' ' +
+        'AND activo = ''S''';
+      Qry.ParamByName('emp').AsString := NumEmp;
+      Qry.ParamByName('cod').AsString := CodInterno;
+      Qry.Open;
+
+      if not Qry.Eof then
+      begin
+        IdPresentacion := Qry.FieldByName('id_presentacion').AsInteger;
+        CodArtAncla    := Trim(Qry.FieldByName('cod_art_ancla').AsString);
+        CodArtLegacy   := Trim(Qry.FieldByName('cod_art_legacy').AsString);
+        Factor         := Qry.FieldByName('factor_a_base').AsFloat;
+        PrecioDerivado := Trim(Qry.FieldByName('precio_derivado').AsString) = 'S';
+        Tara           := Qry.FieldByName('tara_kg').AsFloat;
+        EsVariable     := True;
+        PesoKgBascula  := StrToInt(PesoTexto) / 1000;
+        Result := True;
+      end;
+      Qry.Close;
+      if Result then Exit;
+      // no hizo match como codigo de bascula -- sigue abajo por si de
+      // todos modos hay un codigo_barras FIJO capturado con ese mismo
+      // prefijo (muy improbable, pero no se descarta)
+    end;
+
+    // codigo de barras fijo, impreso en el empaque
+    Qry.SQL.Text :=
+      'SELECT id_presentacion, cod_art_ancla, cod_art_legacy, factor_a_base, ' +
+      'precio_derivado, tara_kg, es_variable FROM art_presentacion ' +
+      'WHERE num_emp = :emp AND codigo_barras = :cod AND activo = ''S''';
+    Qry.ParamByName('emp').AsString := NumEmp;
+    Qry.ParamByName('cod').AsString := Codigo;
+    Qry.Open;
+
+    if not Qry.Eof then
+    begin
+      IdPresentacion := Qry.FieldByName('id_presentacion').AsInteger;
+      CodArtAncla    := Trim(Qry.FieldByName('cod_art_ancla').AsString);
+      CodArtLegacy   := Trim(Qry.FieldByName('cod_art_legacy').AsString);
+      Factor         := Qry.FieldByName('factor_a_base').AsFloat;
+      PrecioDerivado := Trim(Qry.FieldByName('precio_derivado').AsString) = 'S';
+      Tara           := Qry.FieldByName('tara_kg').AsFloat;
+      EsVariable     := Trim(Qry.FieldByName('es_variable').AsString) = 'S';
+      Result := True;
+    end;
+    Qry.Close;
   finally
     Qry.Free;
   end;

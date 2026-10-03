@@ -1,6 +1,6 @@
 # Migración Informix SE 10.0 → Informix Innovator-C 15.0.x (CentOS/RHEL)
 
-Este paquete tiene 7 archivos SQL y este LÉEME. **Ningún archivo aquí mueve
+Este paquete tiene 8 archivos SQL y este LÉEME. **Ningún archivo aquí mueve
 datos por sí solo** — el esquema (tablas/índices/procedimientos/triggers)
 y los datos se migran por separado, que es como IBM/HCL recomiendan hacerlo.
 
@@ -59,8 +59,11 @@ en vez de asumir en qué quedó a medias un intento anterior:
 dbaccess nombrebase 00_drop_objetos_nuevos.sql
 ```
 Borra todo lo que agregan `03_objetos_presentaciones.sql` y
-`delphi/04..07*.sql` (tablas, procedimientos, triggers, la columna que se
-le agregó a `ventas`) y **no toca ningún objeto legacy**. Si algún objeto
+`delphi/04..08*.sql` (tablas, procedimientos, triggers, las columnas que
+se le agregaron a `ventas` y a `art_presentacion`) y **no toca ningún
+objeto legacy**. Las dos columnas de `08_codigo_barras.sql`
+(`codigo_barras`, `codigo_bascula`) se van solas al `DROP TABLE
+art_presentacion` — no hace falta ningún `DROP` aparte para ellas. Si algún objeto
 de la lista todavía no existe, ese `DROP` puntual marca error y sigue con
 el resto — no hace falta correrlo en un orden específico según qué tanto
 se haya aplicado antes. Después de este reset, sigue con el Paso 3 normal.
@@ -73,19 +76,22 @@ dbaccess nombrebase 03_objetos_presentaciones.sql
 ```
 (edita antes el `<NOMBREBASE>` del `DATABASE` al inicio del archivo).
 
-### Paso 3b — Bundles, recepción, cierre diario y motor de Kardex por presentación
+### Paso 3b — Bundles, recepción, cierre diario, motor de Kardex y código de barras
 Todo lo de aquí en adelante es aditivo sobre lo que dejó el Paso 3 — no
 modifica ni un solo objeto legacy, así que no hay ventana de mantenimiento
-especial más allá de la normal para correr DDL. Los 4 archivos son
+especial más allá de la normal para correr DDL. Los 5 archivos son
 independientes entre sí a nivel SQL (ninguno referencia procedimientos o
 tablas de otro), salvo que todos dan por hecho que `art_producto` /
-`art_presentacion` del Paso 3 ya existen. El orden numérico es solo por
-trazabilidad con la auditoría que se les corrió:
+`art_presentacion` del Paso 3 ya existen (`08_codigo_barras.sql` además
+necesita que `art_presentacion` ya exista para poder agregarle sus dos
+columnas nuevas). El orden numérico es solo por trazabilidad con la
+auditoría que se les corrió:
 ```
 dbaccess nombrebase 04_bundles.sql
 dbaccess nombrebase 05_recepcion_compras.sql
 dbaccess nombrebase 06_cierre_diario.sql
 dbaccess nombrebase 07_kardex_por_presentacion.sql
+dbaccess nombrebase 08_codigo_barras.sql
 ```
 (edita antes el `<NOMBREBASE>` del `DATABASE` al inicio de cada archivo;
 los 4 viven en `delphi/`, no en la raíz de `migracion_informix15/`).
@@ -118,9 +124,12 @@ conectando) de tus programas Delphi al servidor nuevo, y agrega los
 `UCierreDiario.pas`, `UReporteNegativos.pas`, `UMantArticulos.pas` y
 `UMantBundles.pas` (todos ya integrados en `UMenuPrincipal.pas`) — sus
 `TStoredProc` fallan al primer `ExecProc` si el Paso 3b no se corrió antes
-en ese servidor. Prueba primero `JUNTA.pas` y el programa de mantenimiento
-de artículos contra el servidor nuevo en un ambiente de pruebas antes del
-corte real.
+en ese servidor. `JUNTA.pas` y `UFormPresentacion.pas` también cambiaron
+(lectura de código de barras escaneado) y dependen de que
+`08_codigo_barras.sql` ya haya corrido. Prueba primero `JUNTA.pas`
+(venta normal y escaneando un código de barras) y el programa de
+mantenimiento de artículos contra el servidor nuevo en un ambiente de
+pruebas antes del corte real.
 
 ## Archivos de este paquete
 
@@ -128,9 +137,10 @@ corte real.
 |---|---|
 | `01_crea_base_datos.sql` | `CREATE DATABASE` en el servidor nuevo, con notas de locale/log/ownership |
 | `02_esquema_legacy_original.sql` | Tu dump de esquema SE 10.0 completo, sin modificar — 208 tablas, ~130 índices, 54 procedimientos, 8 triggers |
-| `00_drop_objetos_nuevos.sql` | Reset de fase de pruebas: borra todo lo de 03..07 sin tocar nada legacy |
+| `00_drop_objetos_nuevos.sql` | Reset de fase de pruebas: borra todo lo de 03..08 sin tocar nada legacy |
 | `03_objetos_presentaciones.sql` | Las tablas/procedimiento/trigger nuevos del catálogo unificado (versión final acordada) |
 | `delphi/04_bundles.sql` | Tablas de canastas/combos (`bundle_producto`, `bundle_detalle`) — sin procedimientos, todo lo resuelve Delphi |
 | `delphi/05_recepcion_compras.sql` | `oc_pedido_detalle`/`oc_recepcion_detalle` + `sp_recibe_renglon_oc` — separa capturar el pedido de recibirlo en almacén |
 | `delphi/06_cierre_diario.sql` | Detección de negativos, recálculo de Kardex y su historial, para `UCierreDiario.pas` |
+| `delphi/08_codigo_barras.sql` | `codigo_barras`/`codigo_bascula` en `art_presentacion` — identificación por código de barras fijo o de báscula para `JUNTA.pas` |
 | `delphi/07_kardex_por_presentacion.sql` | `art_existencia`/`art_kardex_mov` + `sp_aplica_mov_kardex`/`sp_ajusta_existencia_base` — el motor de Kardex unificado por producto |

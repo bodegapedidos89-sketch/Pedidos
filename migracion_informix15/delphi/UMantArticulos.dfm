@@ -233,41 +233,69 @@ object FormMantArticulos: TFormMantArticulos
         'Ambos')
       TabOrder = 7
     end
-    object chkPresentacionActiva: TCheckBox
+    object lblCodigoBarras: TLabel
       Left = 0
       Top = 352
+      Width = 170
+      Height = 13
+      Caption = 'Codigo de barras fijo (opcional)'
+    end
+    object lblCodigoBascula: TLabel
+      Left = 220
+      Top = 352
+      Width = 180
+      Height = 13
+      Caption = 'Codigo interno bascula, 5 dig (opcional)'
+    end
+    object edtCodigoBarras: TEdit
+      Left = 0
+      Top = 370
+      Width = 200
+      Height = 21
+      TabOrder = 8
+    end
+    object edtCodigoBascula: TEdit
+      Left = 220
+      Top = 370
+      Width = 100
+      Height = 21
+      TabOrder = 9
+    end
+    object chkPresentacionActiva: TCheckBox
+      Left = 0
+      Top = 400
       Width = 100
       Height = 17
       Caption = 'Activa'
       Checked = True
       State = cbChecked
-      TabOrder = 8
+      TabOrder = 10
     end
     object btnNuevaPresentacion: TButton
       Left = 0
-      Top = 380
+      Top = 428
       Width = 140
       Height = 25
       Caption = 'Nueva presentacion'
-      TabOrder = 9
+      TabOrder = 11
       OnClick = btnNuevaPresentacionClick
     end
     object btnGuardarPresentacion: TButton
       Left = 146
-      Top = 380
+      Top = 428
       Width = 140
       Height = 25
       Caption = 'Guardar presentacion'
-      TabOrder = 10
+      TabOrder = 12
       OnClick = btnGuardarPresentacionClick
     end
     object btnEliminarPresentacion: TButton
       Left = 292
-      Top = 380
+      Top = 428
       Width = 140
       Height = 25
       Caption = 'Eliminar presentacion'
-      TabOrder = 11
+      TabOrder = 13
       OnClick = btnEliminarPresentacionClick
     end
   end
