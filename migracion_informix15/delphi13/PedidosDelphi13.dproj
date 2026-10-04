@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AVISO: este .dproj se escribio a mano (no se genero ni se abrio
+  nunca con el IDE real de Delphi 13 -- no hay forma de compilar/abrir
+  Delphi aqui para verificarlo). Si al abrirlo Delphi 13 pide
+  "actualizar"/"convertir" el proyecto, acepta sin dudar -- el IDE va
+  a regenerar los metadatos exactos de esta version (ProjectVersion,
+  toolchain, etc.) sin tocar tus unidades. Si prefieres no arriesgarte,
+  la alternativa segura es: File -> New -> VCL Forms Application en
+  Delphi 13, borrar el Form1 que se crea solo, y agregar al proyecto
+  (Project -> Add to Project) los 3 pares .pas/.dfm de esta carpeta
+  (UDMConexion, UMenuPrincipal13, UMantChoferes) en vez de confiar en
+  este archivo.
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ProjectGuid>{A5E6B6B2-6E3D-4C8E-9B9E-1F2C3D4E5F60}</ProjectGuid>
+    <MainSource>PedidosDelphi13.dpr</MainSource>
+    <Base>True</Base>
+    <Config Condition="'$(Config)'==''">Debug</Config>
+    <Platform Condition="'$(Platform)'==''">Win32</Platform>
+    <TargetedPlatforms>1</TargetedPlatforms>
+    <AppType>Application</AppType>
+    <FrameworkType>VCL</FrameworkType>
+    <ProjectVersion>19.0</ProjectVersion>
+    <Workspace>PedidosDelphi13</Workspace>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Base)'!=''">
+    <ReservedKeys>$(Platform);$(Config)</ReservedKeys>
+  </PropertyGroup>
+  <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Base)'=='True') or '$(Base_Win32)'!=''">
+    <Base_Win32>true</Base_Win32>
+    <CfgParent>Base</CfgParent>
+    <Base>true</Base>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Config)'=='Debug' or '$(Cfg_1)'!=''">
+    <Cfg_1>true</Cfg_1>
+    <CfgParent>Base</CfgParent>
+    <Base>true</Base>
+    <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
+    <DCC_DebugInformation>True</DCC_DebugInformation>
+    <DCC_Optimize>False</DCC_Optimize>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Config)'=='Release' or '$(Cfg_2)'!=''">
+    <Cfg_2>true</Cfg_2>
+    <CfgParent>Base</CfgParent>
+    <Base>true</Base>
+    <DCC_DebugInformation>False</DCC_DebugInformation>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Base_Win32)'!=''">
+    <DCC_Namespace>Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
+    <VerInfo_Locale>3082</VerInfo_Locale>
+    <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+    <Icon_MainIcon>PedidosDelphi13_Icon.ico</Icon_MainIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <DelphiCompile Include="$(MainSource)">
+      <MainSource>MainSource</MainSource>
+    </DelphiCompile>
+    <DCCReference Include="UDMConexion.pas">
+      <Form>DMConexion</Form>
+      <DesignClass>TDataModule</DesignClass>
+    </DCCReference>
+    <DCCReference Include="UMenuPrincipal13.pas">
+      <Form>FormMenuPrincipal13</Form>
+      <DesignClass>TForm</DesignClass>
+    </DCCReference>
+    <DCCReference Include="UMantChoferes.pas">
+      <Form>FormMantChoferes</Form>
+      <DesignClass>TForm</DesignClass>
+    </DCCReference>
+    <BuildConfiguration Include="Release">
+      <Key>Cfg_2</Key>
+      <CfgParent>Base</CfgParent>
+    </BuildConfiguration>
+    <BuildConfiguration Include="Debug">
+      <Key>Cfg_1</Key>
+      <CfgParent>Base</CfgParent>
+    </BuildConfiguration>
+  </ItemGroup>
+  <ProjectExtensions>
+    <Borland.Personality>Delphi.Personality.12</Borland.Personality>
+    <Borland.ProjectType>Application</Borland.ProjectType>
+  </ProjectExtensions>
+  <Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
+  <Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj"/>
+</Project>
